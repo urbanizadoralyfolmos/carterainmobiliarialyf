@@ -80,5 +80,5 @@ src/app/(app)/cuotas      - listado de cuotas, pagos y mora
 - Regla de mora: `recargo = saldo_pendiente x (tasa_mora_mensual / 100 / 30) x días_de_atraso`,
   calculada al vuelo (no se guarda en la base). La tasa se define por contrato.
 - RLS: cualquier usuario autenticado puede leer/escribir todas las entidades (pensado
-  para un equipo interno). Si necesitás aislar datos por usuario o agregar roles con
+  para un equipo interno). Si necesitas aislar datos por usuario o agregar roles con
   distintos permisos, se ajusta en las políticas de `supabase/schema.sql`.
