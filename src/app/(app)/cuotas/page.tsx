@@ -130,6 +130,8 @@ export default async function CuotasPage({
             <tr>
               <th className="px-4 py-2">Cliente</th>
               <th className="px-4 py-2">Propiedad</th>
+              <th className="px-4 py-2">Proyecto</th>
+              <th className="px-4 py-2">Contrato</th>
               <th className="px-4 py-2">Cuota</th>
               <th className="px-4 py-2">Vencimiento</th>
               <th className="px-4 py-2">Monto</th>
@@ -147,6 +149,10 @@ export default async function CuotasPage({
                     {c.nombreCliente || "-"}
                   </td>
                   <td className="px-4 py-2 text-slate-600">{c.propiedadesTexto || "-"}</td>
+                  <td className="px-4 py-2 text-slate-600">{c.proyectosTexto || "-"}</td>
+                  <td className="px-4 py-2 text-slate-600">
+                    {c.numeroContrato ? `N.º ${c.numeroContrato}` : "-"}
+                  </td>
                   <td className="px-4 py-2 text-slate-600">{c.numero_cuota === 0 ? "Inicial" : `#${c.numero_cuota}`}</td>
                   <td className="px-4 py-2 text-slate-600">
                     {formatDate(c.fecha_vencimiento)}
@@ -241,7 +247,7 @@ export default async function CuotasPage({
             })}
             {filtradas.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-6 text-center text-slate-400">
+                <td colSpan={10} className="px-4 py-6 text-center text-slate-400">
                   No hay cuotas para este filtro.
                 </td>
               </tr>
