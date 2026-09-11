@@ -109,7 +109,15 @@ export async function getEstadoCuentaContrato(id: string) {
     totalPendiente: Math.max(0, totalMonto - resumenCalculado.totalPagado),
   };
 
-  return { contrato, cliente, nombreCliente, propiedades, resumen };
+  // Cuotas que la persona todavía debe según el contrato: cualquier cuota
+  // ya generada en el sistema que no esté completamente pagada, ordenadas
+  // por número de cuota (la inicial primero).
+  const cuotasPendientes = [...resumen.detalle]
+    .filter((c) => c.estado !== "pagada")
+    .sort((a, b) => a.numero_cuota - b.numero_cuota)
+    .map((c) => ({ ...c, saldo: Math.max(0, c.monto - c.monto_pagado) }));
+
+  return { contrato, cliente, nombreCliente, propiedades, resumen, cuotasPendientes };
 }
 
 export type EstadoCuentaContrato = NonNullable<
