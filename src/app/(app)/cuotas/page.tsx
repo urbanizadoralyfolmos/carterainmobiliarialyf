@@ -124,20 +124,20 @@ export default async function CuotasPage({
         </p>
       )}
 
-      <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
         <table className="min-w-full divide-y divide-slate-200 text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
             <tr>
-              <th className="px-4 py-2">Cliente</th>
-              <th className="px-4 py-2">Propiedad</th>
-              <th className="px-4 py-2">Proyecto</th>
-              <th className="px-4 py-2">Contrato</th>
-              <th className="px-4 py-2">Cuota</th>
-              <th className="px-4 py-2">Vencimiento</th>
-              <th className="px-4 py-2">Monto</th>
-              <th className="px-4 py-2">Días vencida</th>
-              <th className="px-4 py-2">Estado</th>
-              <th className="px-4 py-2 text-right">Acción</th>
+              <th className="whitespace-nowrap px-4 py-2">Cliente</th>
+              <th className="whitespace-nowrap px-4 py-2">Propiedad</th>
+              <th className="whitespace-nowrap px-4 py-2">Proyecto</th>
+              <th className="whitespace-nowrap px-4 py-2">Contrato</th>
+              <th className="whitespace-nowrap px-4 py-2">Cuota</th>
+              <th className="whitespace-nowrap px-4 py-2">Vencimiento</th>
+              <th className="whitespace-nowrap px-4 py-2">Monto</th>
+              <th className="whitespace-nowrap px-4 py-2">Días vencida</th>
+              <th className="whitespace-nowrap px-4 py-2">Estado</th>
+              <th className="whitespace-nowrap px-4 py-2 text-right">Acción</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -192,7 +192,7 @@ export default async function CuotasPage({
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-2 text-right">
+                  <td className="whitespace-nowrap px-4 py-2 text-right">
                     {c.estado === "pagada" || c.estado === "parcial" ? (
                       <div className="flex flex-col items-end gap-1">
                         <Link
