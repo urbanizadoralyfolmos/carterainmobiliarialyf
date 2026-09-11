@@ -95,7 +95,19 @@ export async function getEstadoCuentaContrato(id: string) {
       ? `${cliente.apellido}, ${cliente.nombre}`
       : "Cliente sin datos";
 
-  const resumen = resumenCuotas(cuotasConRecibo, contrato.tasa_mora_mensual);
+  // El "Total contratado" debe reflejar siempre el valor real del contrato
+  // (contrato.monto_total), NO la suma de las cuotas ya cargadas: en varios
+  // contratos falta cargar alguna cuota (por ejemplo la última, de mayor
+  // valor), y sumar solo lo cargado subestima gravemente el total. Se usa
+  // la suma de cuotas únicamente como respaldo si el contrato no tiene
+  // monto_total guardado.
+  const resumenCalculado = resumenCuotas(cuotasConRecibo, contrato.tasa_mora_mensual);
+  const totalMonto = contrato.monto_total ?? resumenCalculado.totalMonto;
+  const resumen = {
+    ...resumenCalculado,
+    totalMonto,
+    totalPendiente: Math.max(0, totalMonto - resumenCalculado.totalPagado),
+  };
 
   return { contrato, cliente, nombreCliente, propiedades, resumen };
 }
