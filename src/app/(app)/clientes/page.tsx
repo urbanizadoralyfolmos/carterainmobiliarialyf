@@ -1,18 +1,32 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { nombreCliente } from "@/lib/utils/format";
 import { eliminarCliente } from "./actions";
+import { SearchInput } from "@/components/SearchInput";
 
-export default async function ClientesPage() {
+export default async function ClientesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
+  const { q } = await searchParams;
   const supabase = await createClient();
-  const { data, error } = await supabase.from("clientes").select("*");
+  const { data: clientesData, error } = await supabase
+    .from("clientes")
+    .select("*")
+    .order("apellido", { ascending: true });
 
-  // Se ordena en JS por el nombre que realmente se muestra (razón social
-  // para jurídicas, apellido+nombre para naturales), ya que son columnas
-  // distintas según el tipo de cliente.
-  const clientes = (data ?? []).sort((a, b) =>
-    nombreCliente(a).localeCompare(nombreCliente(b), "es")
-  );
+  const termino = (q ?? "").trim().toLowerCase();
+  const clientes = (clientesData ?? []).filter((c) => {
+    if (!termino) return true;
+    return (
+      c.nombre.toLowerCase().includes(termino) ||
+      c.apellido.toLowerCase().includes(termino) ||
+      (c.documento ?? "").toLowerCase().includes(termino) ||
+      (c.email ?? "").toLowerCase().includes(termino) ||
+      (c.razon_social ?? "").toLowerCase().includes(termino) ||
+      (c.nit ?? "").toLowerCase().includes(termino)
+    );
+  });
 
   return (
     <div>
@@ -26,6 +40,10 @@ export default async function ClientesPage() {
         </Link>
       </div>
 
+      <div className="mt-3">
+        <SearchInput placeholder="Buscar por nombre, documento, NIT o email..." />
+      </div>
+
       {error && (
         <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
           {error.message}
@@ -37,7 +55,6 @@ export default async function ClientesPage() {
           <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
             <tr>
               <th className="px-4 py-2">Nombre</th>
-              <th className="px-4 py-2">Tipo</th>
               <th className="px-4 py-2">Documento</th>
               <th className="px-4 py-2">Contacto</th>
               <th className="px-4 py-2 text-right">Acciones</th>
@@ -47,23 +64,16 @@ export default async function ClientesPage() {
             {clientes.map((c) => (
               <tr key={c.id}>
                 <td className="px-4 py-2 font-medium text-slate-900">
-                  {nombreCliente(c)}
-                  {c.tipo_persona === "juridica" && c.representante_nombre && (
-                    <div className="text-xs font-normal text-slate-400">
-                      Rep. legal: {c.representante_nombre}
-                    </div>
+                  {c.tipo_persona === "juridica" && c.razon_social ? (
+                    <>
+                      {c.razon_social}
+                      <span className="block text-xs font-normal text-slate-400">
+                        Repr. {c.apellido}, {c.nombre}
+                      </span>
+                    </>
+                  ) : (
+                    `${c.apellido}, ${c.nombre}`
                   )}
-                </td>
-                <td className="px-4 py-2">
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      c.tipo_persona === "juridica"
-                        ? "bg-blue-100 text-blue-800"
-                        : "bg-slate-100 text-slate-700"
-                    }`}
-                  >
-                    {c.tipo_persona === "juridica" ? "Jurídica" : "Natural"}
-                  </span>
                 </td>
                 <td className="px-4 py-2 text-slate-600">
                   {c.tipo_persona === "juridica" ? c.nit ?? "-" : c.documento ?? "-"}
@@ -91,8 +101,10 @@ export default async function ClientesPage() {
             ))}
             {clientes.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-slate-400">
-                  Todavía no hay clientes cargados.
+                <td colSpan={4} className="px-4 py-6 text-center text-slate-400">
+                  {clientesData?.length === 0
+                    ? "Todavía no hay clientes cargados."
+                    : "Ningún cliente coincide con la búsqueda."}
                 </td>
               </tr>
             )}

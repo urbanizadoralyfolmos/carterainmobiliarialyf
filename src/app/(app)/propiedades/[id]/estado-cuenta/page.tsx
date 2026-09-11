@@ -1,28 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { formatMoney, formatDate, nombreClienteDirecto, type ClienteParaEtiqueta } from "@/lib/utils/format";
+import { formatMoney, formatDate } from "@/lib/utils/format";
 import { resumenCuotas } from "@/lib/utils/estado-cuenta";
 import { PrintButton } from "@/components/PrintButton";
-
-type ContratoConDetalle = {
-  id: string;
-  numero: number;
-  estado: string;
-  moneda: string;
-  tasa_mora_mensual: number;
-  created_at: string;
-  clientes?: ClienteParaEtiqueta | null;
-  cuotas?: {
-    id: string;
-    numero_cuota: number;
-    fecha_vencimiento: string;
-    monto: number;
-    monto_pagado: number;
-    estado: string;
-    fecha_pago: string | null;
-  }[];
-};
 
 export default async function EstadoCuentaPropiedadPage({
   params,
@@ -43,13 +24,38 @@ export default async function EstadoCuentaPropiedadPage({
   const { data: vinculos } = await supabase
     .from("contrato_propiedades")
     .select(
-      "contratos(*, clientes(nombre, apellido, documento, tipo_persona, razon_social), cuotas(id, numero_cuota, fecha_vencimiento, monto, monto_pagado, estado, fecha_pago))"
+      "contratos(*, clientes(nombre, apellido, documento), cuotas(id, numero_cuota, fecha_vencimiento, monto, monto_pagado, estado, fecha_pago))"
     )
     .eq("propiedad_id", id);
 
+  type ClienteRel = { nombre: string; apellido: string; documento: string | null };
+  type ContratoRel = {
+    id: string;
+    numero: number;
+    estado: string;
+    moneda: string;
+    tasa_mora_mensual: number;
+    created_at: string;
+    clientes?: ClienteRel | ClienteRel[] | null;
+    cuotas?:
+      | {
+          id: string;
+          numero_cuota: number;
+          fecha_vencimiento: string;
+          monto: number;
+          monto_pagado: number;
+          estado: string;
+          fecha_pago: string | null;
+        }[]
+      | null;
+  };
+
   const contratos = (vinculos ?? [])
-    .map((v) => v.contratos as unknown as ContratoConDetalle | null)
-    .filter((c): c is ContratoConDetalle => !!c)
+    .map((v) => {
+      const c = v.contratos as ContratoRel | ContratoRel[] | null;
+      return Array.isArray(c) ? c[0] : c;
+    })
+    .filter((c): c is ContratoRel => Boolean(c))
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   const proyectoRel = propiedad.proyectos as
@@ -59,10 +65,15 @@ export default async function EstadoCuentaPropiedadPage({
     | undefined;
   const proyecto = Array.isArray(proyectoRel) ? proyectoRel[0] : proyectoRel;
 
-  const contratosConResumen = (contratos ?? []).map((contrato) => ({
-    ...contrato,
-    resumen: resumenCuotas(contrato.cuotas ?? [], contrato.tasa_mora_mensual),
-  }));
+  const contratosConResumen = contratos.map((contrato) => {
+    const clienteRel = contrato.clientes;
+    const cliente = Array.isArray(clienteRel) ? clienteRel[0] : clienteRel;
+    return {
+      ...contrato,
+      cliente,
+      resumen: resumenCuotas(contrato.cuotas ?? [], contrato.tasa_mora_mensual),
+    };
+  });
 
   return (
     <div>
@@ -87,7 +98,9 @@ export default async function EstadoCuentaPropiedadPage({
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-slate-900">
                 Contrato N.º {contrato.numero} ·{" "}
-                {contrato.clientes ? nombreClienteDirecto(contrato.clientes) : "-"}
+                {contrato.cliente
+                  ? `${contrato.cliente.nombre} ${contrato.cliente.apellido}`
+                  : "-"}
               </h2>
               <span className="text-xs text-slate-500">{contrato.estado}</span>
             </div>

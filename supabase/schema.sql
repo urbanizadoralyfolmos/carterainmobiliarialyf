@@ -44,46 +44,81 @@ create table if not exists public.clientes (
   telefono text,
   direccion text,
   notas text,
+  tipo_persona text not null default 'natural' check (tipo_persona in ('natural', 'juridica')),
+  razon_social text,
+  nit text,
+  representante_nombre text,
+  representante_documento text,
   created_by uuid references auth.users(id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 -- ------------------------------------------------------------
--- Tabla: propiedades
+-- Tabla: proyectos (urbanizaciones)
+-- ------------------------------------------------------------
+create table if not exists public.proyectos (
+  id uuid primary key default gen_random_uuid(),
+  nombre text not null,
+  ciudad text,
+  descripcion text,
+  valor_m2 numeric,
+  created_by uuid references auth.users(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.proyectos enable row level security;
+
+drop policy if exists "proyectos_all_authenticated" on public.proyectos;
+create policy "proyectos_all_authenticated" on public.proyectos
+  for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+
+-- ------------------------------------------------------------
+-- Tabla: propiedades (incluye lotes de proyectos/urbanizaciones)
 -- ------------------------------------------------------------
 create table if not exists public.propiedades (
   id uuid primary key default gen_random_uuid(),
   direccion text not null,
   ciudad text,
   tipo text not null default 'departamento'
-    check (tipo in ('departamento', 'casa', 'local', 'terreno', 'oficina', 'otro')),
+    check (tipo in ('lote', 'departamento', 'casa', 'local', 'terreno', 'oficina', 'otro')),
   superficie_m2 numeric,
   valor_referencia numeric,
   estado text not null default 'disponible'
-    check (estado in ('disponible', 'alquilada', 'vendida', 'reservada')),
+    check (estado in ('disponible', 'prometido_en_venta', 'escriturado', 'facturado')),
+  numero_escritura text,
+  fecha_escritura date,
+  numero_factura text,
+  proyecto_id uuid references public.proyectos(id) on delete set null,
+  numero_lote text,
+  manzana text,
   descripcion text,
   created_by uuid references auth.users(id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
+create index if not exists idx_propiedades_proyecto on public.propiedades(proyecto_id);
+create index if not exists idx_propiedades_manzana on public.propiedades(proyecto_id, manzana);
+
 -- ------------------------------------------------------------
 -- Tabla: contratos
 -- ------------------------------------------------------------
 create table if not exists public.contratos (
   id uuid primary key default gen_random_uuid(),
+  numero integer generated always as identity,
   cliente_id uuid not null references public.clientes(id) on delete restrict,
-  propiedad_id uuid not null references public.propiedades(id) on delete restrict,
   tipo text not null default 'alquiler' check (tipo in ('alquiler', 'venta')),
   fecha_inicio date not null,
   fecha_fin date,
-  monto_cuota numeric not null,
-  moneda text not null default 'ARS',
+  monto_total numeric,
+  cuota_inicial numeric not null default 0,
+  moneda text not null default 'COP',
   cantidad_cuotas integer not null default 12,
   dia_vencimiento integer not null default 10 check (dia_vencimiento between 1 and 28),
   tasa_mora_mensual numeric not null default 5,
-  estado text not null default 'activo' check (estado in ('activo', 'finalizado', 'cancelado')),
+  estado text not null default 'activo' check (estado in ('activo', 'cancelado', 'cedido', 'escriturado')),
   notas text,
   created_by uuid references auth.users(id),
   created_at timestamptz not null default now(),
@@ -91,7 +126,27 @@ create table if not exists public.contratos (
 );
 
 create index if not exists idx_contratos_cliente on public.contratos(cliente_id);
-create index if not exists idx_contratos_propiedad on public.contratos(propiedad_id);
+
+-- ------------------------------------------------------------
+-- Tabla puente: contrato_propiedades (un contrato puede incluir
+-- varios lotes/propiedades, y en teoría una propiedad podría
+-- quedar ligada a más de un contrato a lo largo del tiempo).
+-- ------------------------------------------------------------
+create table if not exists public.contrato_propiedades (
+  contrato_id uuid not null references public.contratos(id) on delete cascade,
+  propiedad_id uuid not null references public.propiedades(id) on delete restrict,
+  created_at timestamptz not null default now(),
+  primary key (contrato_id, propiedad_id)
+);
+
+create index if not exists idx_contrato_propiedades_contrato on public.contrato_propiedades(contrato_id);
+create index if not exists idx_contrato_propiedades_propiedad on public.contrato_propiedades(propiedad_id);
+
+alter table public.contrato_propiedades enable row level security;
+
+drop policy if exists "contrato_propiedades_all_authenticated" on public.contrato_propiedades;
+create policy "contrato_propiedades_all_authenticated" on public.contrato_propiedades
+  for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
 -- ------------------------------------------------------------
 -- Tabla: cuotas
@@ -106,6 +161,7 @@ create table if not exists public.cuotas (
   fecha_pago date,
   estado text not null default 'pendiente'
     check (estado in ('pendiente', 'pagada', 'parcial', 'vencida')),
+  referencia text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (contrato_id, numero_cuota)
@@ -113,6 +169,27 @@ create table if not exists public.cuotas (
 
 create index if not exists idx_cuotas_contrato on public.cuotas(contrato_id);
 create index if not exists idx_cuotas_vencimiento on public.cuotas(fecha_vencimiento);
+
+-- ------------------------------------------------------------
+-- Tabla: recibos (comprobante de cada pago registrado)
+-- ------------------------------------------------------------
+create table if not exists public.recibos (
+  id uuid primary key default gen_random_uuid(),
+  numero integer generated always as identity,
+  cuota_id uuid not null references public.cuotas(id) on delete cascade,
+  monto numeric not null,
+  fecha_pago date not null,
+  created_by uuid references auth.users(id),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_recibos_cuota on public.recibos(cuota_id);
+
+alter table public.recibos enable row level security;
+
+drop policy if exists "recibos_all_authenticated" on public.recibos;
+create policy "recibos_all_authenticated" on public.recibos
+  for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
 -- ------------------------------------------------------------
 -- Vista: cuotas con mora calculada al día de hoy
@@ -150,6 +227,10 @@ begin
   return new;
 end;
 $$;
+
+drop trigger if exists trg_proyectos_updated on public.proyectos;
+create trigger trg_proyectos_updated before update on public.proyectos
+  for each row execute procedure public.set_updated_at();
 
 drop trigger if exists trg_clientes_updated on public.clientes;
 create trigger trg_clientes_updated before update on public.clientes

@@ -1,20 +1,17 @@
 export type Cliente = {
   id: string;
-  tipo_persona: "natural" | "juridica";
-  // Persona natural
-  nombre: string | null;
-  apellido: string | null;
+  nombre: string;
+  apellido: string;
   documento: string | null;
-  // Persona jurídica (sociedad)
-  razon_social: string | null;
-  nit: string | null;
-  representante_nombre: string | null;
-  representante_documento: string | null;
-  // Comunes (para persona jurídica son los datos de la sociedad)
   email: string | null;
   telefono: string | null;
   direccion: string | null;
   notas: string | null;
+  tipo_persona: "natural" | "juridica";
+  razon_social: string | null;
+  nit: string | null;
+  representante_nombre: string | null;
+  representante_documento: string | null;
   created_at: string;
 };
 
@@ -46,6 +43,13 @@ export type Propiedad = {
   proyectos?: Proyecto;
 };
 
+/** Fila de la tabla puente contrato_propiedades (relación varios a varios). */
+export type ContratoPropiedad = {
+  contrato_id: string;
+  propiedad_id: string;
+  created_at: string;
+};
+
 export type Contrato = {
   id: string;
   numero: number;
@@ -63,8 +67,7 @@ export type Contrato = {
   notas: string | null;
   created_at: string;
   clientes?: Cliente;
-  // Un contrato puede tener una o más propiedades (tabla puente
-  // contrato_propiedades). Se completa solo cuando la consulta lo pide.
+  /** Un contrato puede tener uno o varios lotes/propiedades asociados. */
   propiedades?: Propiedad[];
 };
 
@@ -77,6 +80,7 @@ export type Cuota = {
   monto_pagado: number;
   fecha_pago: string | null;
   estado: string;
+  referencia: string | null;
   created_at: string;
   contratos?: Contrato;
 };

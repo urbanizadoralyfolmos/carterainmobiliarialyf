@@ -1,13 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import {
-  formatMoney,
-  formatDate,
-  formatPropiedadesLabel,
-  nombreCliente,
-  type PropiedadParaEtiqueta,
-} from "@/lib/utils/format";
+import { formatMoney, formatDate } from "@/lib/utils/format";
 import { resumenCuotas } from "@/lib/utils/estado-cuenta";
 import { PrintButton } from "@/components/PrintButton";
 
@@ -40,26 +34,33 @@ export default async function EstadoCuentaClientePage({
   let granTotalPendiente = 0;
   let granTotalMora = 0;
 
-  const contratosConResumen: (NonNullable<typeof contratos>[number] & {
-    resumen: ReturnType<typeof resumenCuotas>;
-    propiedadesLabel: string;
-  })[] = [];
-
-  for (const contrato of contratos ?? []) {
+  const contratosConResumen = (contratos ?? []).map((contrato) => {
     const resumen = resumenCuotas(contrato.cuotas ?? [], contrato.tasa_mora_mensual);
     granTotalMonto += resumen.totalMonto;
     granTotalPagado += resumen.totalPagado;
     granTotalPendiente += resumen.totalPendiente;
     granTotalMora += resumen.totalMora;
-    const propiedadesDelContrato = (contrato.contrato_propiedades ?? []).map(
-      (cp: { propiedades: PropiedadParaEtiqueta }) => cp.propiedades
-    );
-    contratosConResumen.push({
-      ...contrato,
-      resumen,
-      propiedadesLabel: formatPropiedadesLabel(propiedadesDelContrato),
-    });
-  }
+    const propiedades = (contrato.contrato_propiedades ?? [])
+      .map(
+        (cp: {
+          propiedades: {
+            direccion: string;
+            proyectos?: { nombre: string } | { nombre: string }[] | null;
+          } | null;
+        }) => cp.propiedades
+      )
+      .filter(Boolean) as {
+      direccion: string;
+      proyectos?: { nombre: string } | { nombre: string }[] | null;
+    }[];
+    const primeraProyectoRel = propiedades[0]?.proyectos as
+      | { nombre: string }
+      | { nombre: string }[]
+      | null
+      | undefined;
+    const proyecto = Array.isArray(primeraProyectoRel) ? primeraProyectoRel[0] : primeraProyectoRel;
+    return { ...contrato, resumen, proyecto, propiedades };
+  });
 
   return (
     <div>
@@ -72,20 +73,10 @@ export default async function EstadoCuentaClientePage({
 
       <div className="mt-4 rounded-lg border border-slate-200 bg-white p-6 print:border-0 print:p-0">
         <h1 className="text-lg font-semibold text-slate-900">
-          Estado de cuenta: {nombreCliente(cliente)}
+          Estado de cuenta: {cliente.nombre} {cliente.apellido}
         </h1>
-        {cliente.tipo_persona === "juridica" ? (
-          <>
-            {cliente.nit && <p className="text-sm text-slate-500">NIT {cliente.nit}</p>}
-            {cliente.representante_nombre && (
-              <p className="text-xs text-slate-400">
-                Representante legal: {cliente.representante_nombre}
-                {cliente.representante_documento ? ` · Doc. ${cliente.representante_documento}` : ""}
-              </p>
-            )}
-          </>
-        ) : (
-          cliente.documento && <p className="text-sm text-slate-500">Doc. {cliente.documento}</p>
+        {cliente.documento && (
+          <p className="text-sm text-slate-500">Doc. {cliente.documento}</p>
         )}
         <p className="mt-1 text-xs text-slate-400">
           Generado el {formatDate(new Date().toISOString().slice(0, 10))}
@@ -122,7 +113,13 @@ export default async function EstadoCuentaClientePage({
           <div key={contrato.id} className="mt-6 border-t border-slate-200 pt-4">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-slate-900">
-                Contrato N.º {contrato.numero} · {contrato.propiedadesLabel}
+                Contrato N.º {contrato.numero}
+                {contrato.proyecto?.nombre ? ` · ${contrato.proyecto.nombre}` : ""}
+                {contrato.propiedades.length > 0
+                  ? ` · ${contrato.propiedades
+                      .map((p: { direccion: string }) => p.direccion)
+                      .join(", ")}`
+                  : ""}
               </h2>
               <span className="text-xs text-slate-500">{contrato.estado}</span>
             </div>

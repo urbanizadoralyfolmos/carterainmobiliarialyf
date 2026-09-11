@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Propiedad, Proyecto } from "@/lib/types";
 
 export function PropiedadForm({
@@ -21,22 +21,21 @@ export function PropiedadForm({
   const [superficie, setSuperficie] = useState(
     propiedad?.superficie_m2 != null ? String(propiedad.superficie_m2) : ""
   );
-  // Mientras valorAuto sea true, el valor mostrado se deriva de
-  // área × valor por m² en cada render (sin efecto). valorManual guarda
-  // lo que la persona haya tipeado a mano si decide sobrescribirlo.
-  const [valorManual, setValorManual] = useState(
+  const [valor, setValor] = useState(
     propiedad?.valor_referencia != null ? String(propiedad.valor_referencia) : ""
   );
   const [valorAuto, setValorAuto] = useState(!propiedad?.valor_referencia);
 
   const proyectoSeleccionado = proyectos?.find((p) => p.id === proyectoId);
 
-  const area = parseFloat(superficie);
-  const valorCalculado =
-    valorAuto && proyectoSeleccionado?.valor_m2 && area > 0
-      ? Math.round(area * proyectoSeleccionado.valor_m2 * 100) / 100
-      : null;
-  const valorMostrado = valorAuto ? (valorCalculado != null ? String(valorCalculado) : "") : valorManual;
+  useEffect(() => {
+    if (!valorAuto) return;
+    const area = parseFloat(superficie);
+    if (proyectoSeleccionado?.valor_m2 && area > 0) {
+      const calculado = Math.round(area * proyectoSeleccionado.valor_m2 * 100) / 100;
+      setValor(String(calculado));
+    }
+  }, [proyectoId, superficie, valorAuto, proyectoSeleccionado]);
 
   return (
     <form action={action} className="mt-4 grid max-w-2xl grid-cols-2 gap-4">
@@ -126,9 +125,9 @@ export function PropiedadForm({
           type="number"
           step="0.01"
           name="valor_referencia"
-          value={valorMostrado}
+          value={valor}
           onChange={(e) => {
-            setValorManual(e.target.value);
+            setValor(e.target.value);
             setValorAuto(e.target.value === "");
           }}
           className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"

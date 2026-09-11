@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { formatMoney, formatDate, formatPropiedadesLabel, nombreCliente, type PropiedadParaEtiqueta } from "@/lib/utils/format";
+import { formatMoney, formatDate } from "@/lib/utils/format";
 
 export default async function RecibosPage({
   searchParams,
@@ -13,7 +13,7 @@ export default async function RecibosPage({
   let query = supabase
     .from("recibos")
     .select(
-      "*, cuotas(numero_cuota, contratos(numero, moneda, clientes(nombre, apellido, tipo_persona, razon_social), contrato_propiedades(propiedades(direccion))))"
+      "*, cuotas(numero_cuota, contratos(numero, moneda, clientes(nombre, apellido), contrato_propiedades(propiedades(direccion))))"
     )
     .order("created_at", { ascending: false });
 
@@ -52,18 +52,19 @@ export default async function RecibosPage({
               const c = r.cuotas;
               const contrato = c?.contratos;
               const moneda = contrato?.moneda ?? "COP";
+              const propiedades = (contrato?.contrato_propiedades ?? [])
+                .map((cp: { propiedades: { direccion: string } | null }) => cp.propiedades?.direccion)
+                .filter(Boolean);
               return (
                 <tr key={r.id}>
                   <td className="px-4 py-2 font-medium text-slate-900">{r.numero}</td>
                   <td className="px-4 py-2 text-slate-600">
-                    {contrato?.clientes ? nombreCliente(contrato.clientes) : "-"}
+                    {contrato?.clientes
+                      ? `${contrato.clientes.apellido}, ${contrato.clientes.nombre}`
+                      : "-"}
                   </td>
                   <td className="px-4 py-2 text-slate-600">
-                    {formatPropiedadesLabel(
-                      (contrato?.contrato_propiedades ?? []).map(
-                        (cp: { propiedades: PropiedadParaEtiqueta }) => cp.propiedades
-                      )
-                    )}
+                    {propiedades.length > 0 ? propiedades.join(", ") : "-"}
                   </td>
                   <td className="px-4 py-2 text-slate-600">
                     {c?.numero_cuota === 0 ? "Inicial" : `#${c?.numero_cuota}`}

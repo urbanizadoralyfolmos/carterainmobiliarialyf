@@ -22,8 +22,9 @@ function readContratoForm(formData: FormData) {
   };
 }
 
+/** Un contrato puede incluir uno o varios lotes/propiedades (checkboxes en el formulario). */
 function readPropiedadIds(formData: FormData) {
-  return Array.from(new Set(formData.getAll("propiedad_ids").map(String).filter(Boolean)));
+  return formData.getAll("propiedad_ids").map(String).filter(Boolean);
 }
 
 export async function crearContrato(formData: FormData) {
@@ -32,7 +33,9 @@ export async function crearContrato(formData: FormData) {
   const propiedadIds = readPropiedadIds(formData);
 
   if (propiedadIds.length === 0) {
-    redirect(`/contratos/nuevo?error=${encodeURIComponent("Seleccioná al menos una propiedad para el contrato")}`);
+    redirect(
+      `/contratos/nuevo?error=${encodeURIComponent("Selecciona al menos una propiedad/lote.")}`
+    );
   }
 
   const { data: contrato, error } = await supabase
@@ -45,9 +48,9 @@ export async function crearContrato(formData: FormData) {
     redirect(`/contratos/nuevo?error=${encodeURIComponent(error?.message ?? "Error")}`);
   }
 
-  const { error: errorVinculos } = await supabase
-    .from("contrato_propiedades")
-    .insert(propiedadIds.map((propiedad_id) => ({ contrato_id: contrato.id, propiedad_id })));
+  const { error: errorVinculos } = await supabase.from("contrato_propiedades").insert(
+    propiedadIds.map((propiedad_id) => ({ contrato_id: contrato.id, propiedad_id }))
+  );
   if (errorVinculos) {
     redirect(`/contratos/nuevo?error=${encodeURIComponent(errorVinculos.message)}`);
   }
@@ -100,8 +103,8 @@ export async function crearContrato(formData: FormData) {
   }
 
   // Las propiedades pasan a "prometido en venta" al quedar ligadas a un
-  // contrato (solo las que todavía estaban disponibles; no se pisa un
-  // estado más avanzado).
+  // contrato (solo si todavía estaban disponibles; no se pisa un estado
+  // más avanzado como escriturado/facturado).
   await supabase
     .from("propiedades")
     .update({ estado: "prometido_en_venta" })
@@ -120,7 +123,9 @@ export async function actualizarContrato(id: string, formData: FormData) {
   const propiedadIds = readPropiedadIds(formData);
 
   if (propiedadIds.length === 0) {
-    redirect(`/contratos/${id}?error=${encodeURIComponent("Seleccioná al menos una propiedad para el contrato")}`);
+    redirect(
+      `/contratos/${id}?error=${encodeURIComponent("Selecciona al menos una propiedad/lote.")}`
+    );
   }
 
   // No se regenera el plan de cuotas al editar: solo se actualizan los
@@ -130,13 +135,13 @@ export async function actualizarContrato(id: string, formData: FormData) {
     redirect(`/contratos/${id}?error=${encodeURIComponent(error.message)}`);
   }
 
-  // Comparamos contra el vínculo actual para saber qué propiedades se
-  // agregan y cuáles se sacan del contrato.
-  const { data: actuales } = await supabase
+  // Reemplaza el conjunto de propiedades vinculadas por el nuevo seleccionado.
+  const { data: vinculosActuales } = await supabase
     .from("contrato_propiedades")
     .select("propiedad_id")
     .eq("contrato_id", id);
-  const idsActuales = new Set((actuales ?? []).map((v) => v.propiedad_id as string));
+
+  const idsActuales = new Set((vinculosActuales ?? []).map((v) => v.propiedad_id));
   const idsNuevos = new Set(propiedadIds);
 
   const aQuitar = [...idsActuales].filter((pid) => !idsNuevos.has(pid));
@@ -148,24 +153,13 @@ export async function actualizarContrato(id: string, formData: FormData) {
       .delete()
       .eq("contrato_id", id)
       .in("propiedad_id", aQuitar);
-
-    // Las propiedades que se desvinculan y seguían "prometido en venta"
-    // vuelven a quedar disponibles.
-    await supabase
-      .from("propiedades")
-      .update({ estado: "disponible" })
-      .in("id", aQuitar)
-      .eq("estado", "prometido_en_venta");
   }
-
   if (aAgregar.length > 0) {
-    const { error: errorAgregar } = await supabase
+    await supabase
       .from("contrato_propiedades")
       .insert(aAgregar.map((propiedad_id) => ({ contrato_id: id, propiedad_id })));
-    if (errorAgregar) {
-      redirect(`/contratos/${id}?error=${encodeURIComponent(errorAgregar.message)}`);
-    }
-
+  }
+  if (aAgregar.length > 0) {
     await supabase
       .from("propiedades")
       .update({ estado: "prometido_en_venta" })
@@ -183,6 +177,5 @@ export async function eliminarContrato(id: string) {
   await supabase.from("contratos").delete().eq("id", id);
   revalidatePath("/contratos");
   revalidatePath("/cuotas");
-  revalidatePath("/propiedades");
   redirect("/contratos");
 }

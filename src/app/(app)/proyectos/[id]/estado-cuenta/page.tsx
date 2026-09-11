@@ -1,27 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { formatMoney, formatDate, nombreClienteDirecto, type ClienteParaEtiqueta } from "@/lib/utils/format";
+import { formatMoney, formatDate } from "@/lib/utils/format";
 import { resumenCuotas } from "@/lib/utils/estado-cuenta";
 import { PrintButton } from "@/components/PrintButton";
-
-type ContratoConDetalle = {
-  numero: number;
-  estado: string;
-  moneda: string;
-  tasa_mora_mensual: number;
-  created_at: string;
-  clientes?: ClienteParaEtiqueta | null;
-  cuotas?: {
-    id: string;
-    numero_cuota: number;
-    fecha_vencimiento: string;
-    monto: number;
-    monto_pagado: number;
-    estado: string;
-    fecha_pago: string | null;
-  }[];
-};
 
 export default async function ReporteProyectoPage({
   params,
@@ -42,21 +24,25 @@ export default async function ReporteProyectoPage({
   const { data: propiedades } = await supabase
     .from("propiedades")
     .select(
-      "*, contrato_propiedades(contratos(*, clientes(nombre, apellido, tipo_persona, razon_social), cuotas(id, numero_cuota, fecha_vencimiento, monto, monto_pagado, estado, fecha_pago)))"
+      "*, contrato_propiedades(contratos(*, clientes(nombre, apellido), cuotas(id, numero_cuota, fecha_vencimiento, monto, monto_pagado, estado, fecha_pago)))"
     )
     .eq("proyecto_id", id)
     .order("numero_lote", { ascending: true });
 
   const filas = (propiedades ?? []).map((p) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const contratosVinculados = ((p.contrato_propiedades ?? []) as any[])
+      .map((cp) => cp.contratos)
+      .filter(Boolean);
+
     // contrato vigente más reciente que no esté cancelado (si existe)
-    const contratosDeLaPropiedad = (p.contrato_propiedades ?? [])
-      .map((cp: { contratos: ContratoConDetalle | null }) => cp.contratos)
-      .filter((c: ContratoConDetalle | null): c is ContratoConDetalle => !!c);
-    const contratosOrdenados = [...contratosDeLaPropiedad].sort(
+    const contratosOrdenados = [...contratosVinculados].sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
     const contrato = contratosOrdenados.find((c) => c.estado !== "cancelado") ?? null;
-    const resumen = contrato ? resumenCuotas(contrato.cuotas ?? [], contrato.tasa_mora_mensual) : null;
+    const resumen = contrato
+      ? resumenCuotas(contrato.cuotas ?? [], contrato.tasa_mora_mensual)
+      : null;
     return { propiedad: p, contrato, resumen };
   });
 
@@ -144,7 +130,9 @@ export default async function ReporteProyectoPage({
                     {f.propiedad.direccion}
                   </td>
                   <td className="py-1 pr-3 text-slate-600">
-                    {f.contrato?.clientes ? nombreClienteDirecto(f.contrato.clientes) : "-"}
+                    {f.contrato?.clientes
+                      ? `${f.contrato.clientes.nombre} ${f.contrato.clientes.apellido}`
+                      : "-"}
                   </td>
                   <td className="py-1 pr-3 text-slate-600">
                     N.º {f.contrato?.numero}

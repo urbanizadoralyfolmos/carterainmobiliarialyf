@@ -23,22 +23,25 @@ export default async function EditarPropiedadPage({
 
   if (!propiedad) notFound();
 
-  const [{ data: vinculos }, { data: proyectos }] = await Promise.all([
+  const [{ data: vinculo }, { data: proyectos }] = await Promise.all([
     supabase
       .from("contrato_propiedades")
       .select("contratos(numero, estado, created_at)")
-      .eq("propiedad_id", id),
+      .eq("propiedad_id", id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
     supabase.from("proyectos").select("id, nombre, valor_m2").order("nombre"),
   ]);
 
-  const contratoVinculado = (vinculos ?? [])
-    .map(
-      (v) =>
-        v.contratos as unknown as { numero: number; estado: string; created_at: string } | null
-    )
-    .filter((c): c is { numero: number; estado: string; created_at: string } => !!c)
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0] ??
-    null;
+  const contratoVinculadoRel = vinculo?.contratos as
+    | { numero: number; estado: string }
+    | { numero: number; estado: string }[]
+    | null
+    | undefined;
+  const contratoVinculado = Array.isArray(contratoVinculadoRel)
+    ? contratoVinculadoRel[0]
+    : contratoVinculadoRel;
 
   const actualizarConId = actualizarPropiedad.bind(null, id);
 

@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ClienteForm } from "@/components/ClienteForm";
-import { nombreCliente } from "@/lib/utils/format";
 import { actualizarCliente } from "../actions";
 
 export default async function EditarClientePage({
@@ -30,7 +29,7 @@ export default async function EditarClientePage({
     <div>
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-slate-900">
-          Editar cliente: {nombreCliente(cliente)}
+          Editar cliente: {cliente.nombre} {cliente.apellido}
         </h1>
         <Link
           href={`/clientes/${id}/estado-cuenta`}

@@ -1,26 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Cliente, Contrato, Propiedad } from "@/lib/types";
 import { fechaCuota } from "@/lib/utils/plan";
-import { formatMoney, formatDate, etiquetaPropiedad, nombreCliente } from "@/lib/utils/format";
-
-type PropiedadOpcion = Pick<Propiedad, "id" | "direccion"> & {
-  proyectos?: { nombre: string } | { nombre: string }[] | null;
-};
+import { formatMoney, formatDate } from "@/lib/utils/format";
 
 export function ContratoForm({
   contrato,
   clientes,
   propiedades,
-  propiedadIdsSeleccionadas,
+  propiedadIdsSeleccionadas = [],
   action,
   error,
   esNuevo,
 }: {
   contrato?: Partial<Contrato>;
-  clientes: Pick<Cliente, "id" | "nombre" | "apellido" | "tipo_persona" | "razon_social">[];
-  propiedades: PropiedadOpcion[];
+  clientes: Pick<Cliente, "id" | "nombre" | "apellido">[];
+  propiedades: (Pick<Propiedad, "id" | "direccion" | "manzana" | "numero_lote"> & {
+    proyectos?: { nombre: string } | { nombre: string }[] | null;
+  })[];
+  /** ids de las propiedades ya vinculadas a este contrato (para editar). */
   propiedadIdsSeleccionadas?: string[];
   action: (formData: FormData) => void;
   error?: string;
@@ -33,25 +32,12 @@ export function ContratoForm({
   const [montos, setMontos] = useState<number[]>(
     Array.from({ length: contrato?.cantidad_cuotas ?? 12 }, () => 0)
   );
-  const [busquedaPropiedad, setBusquedaPropiedad] = useState("");
-  const [propiedadesSeleccionadas, setPropiedadesSeleccionadas] = useState<Set<string>>(
-    new Set(propiedadIdsSeleccionadas ?? [])
+  const [seleccionadas, setSeleccionadas] = useState<Set<string>>(
+    new Set(propiedadIdsSeleccionadas)
   );
 
-  function actualizarCantidadCuotas(valor: number) {
-    const nueva = Math.max(1, valor || 1);
-    setCantidadCuotas(nueva);
-    setMontos((prev) => {
-      const next = prev.slice(0, nueva);
-      while (next.length < nueva) next.push(0);
-      return next;
-    });
-  }
-
-  const totalCuotas = montos.reduce((acc, m) => acc + (Number(m) || 0), 0);
-
-  function togglePropiedad(id: string) {
-    setPropiedadesSeleccionadas((prev) => {
+  function toggleSeleccionada(id: string) {
+    setSeleccionadas((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -59,10 +45,15 @@ export function ContratoForm({
     });
   }
 
-  const propiedadesFiltradas = propiedades.filter((p) =>
-    etiquetaPropiedad(p).toLowerCase().includes(busquedaPropiedad.toLowerCase())
-  );
-  const detalleSeleccionadas = propiedades.filter((p) => propiedadesSeleccionadas.has(p.id));
+  useEffect(() => {
+    setMontos((prev) => {
+      const next = prev.slice(0, cantidadCuotas);
+      while (next.length < cantidadCuotas) next.push(0);
+      return next;
+    });
+  }, [cantidadCuotas]);
+
+  const totalCuotas = montos.reduce((acc, m) => acc + (Number(m) || 0), 0);
 
   return (
     <form action={action} className="mt-4 max-w-3xl">
@@ -78,75 +69,57 @@ export function ContratoForm({
             <option value="">Seleccionar...</option>
             {clientes.map((c) => (
               <option key={c.id} value={c.id}>
-                {nombreCliente(c)}
+                {c.apellido}, {c.nombre}
               </option>
             ))}
           </select>
         </div>
-
         <div className="col-span-2">
           <label className="block text-sm font-medium text-slate-700">
-            Propiedades del contrato (
-            {propiedadesSeleccionadas.size} seleccionada
-            {propiedadesSeleccionadas.size !== 1 ? "s" : ""})
+            Propiedades / lotes ({seleccionadas.size} seleccionada
+            {seleccionadas.size === 1 ? "" : "s"})
           </label>
-
-          {detalleSeleccionadas.length > 0 && (
-            <div className="mt-1 flex flex-wrap gap-1">
-              {detalleSeleccionadas.map((p) => (
-                <span
+          <p className="mt-0.5 text-xs text-slate-400">
+            Un contrato puede incluir uno o varios lotes (por ejemplo, varios lotes de la
+            misma manzana vendidos juntos).
+          </p>
+          <div className="mt-1 max-h-48 overflow-y-auto rounded-md border border-slate-300 p-2">
+            {propiedades.map((p) => {
+              const proyecto = Array.isArray(p.proyectos) ? p.proyectos[0] : p.proyectos;
+              const detalle = [
+                proyecto?.nombre,
+                p.manzana ? `Mz. ${p.manzana}` : null,
+                p.numero_lote ? `Lote ${p.numero_lote}` : null,
+              ]
+                .filter(Boolean)
+                .join(" · ");
+              return (
+                <label
                   key={p.id}
-                  className="flex items-center gap-1 rounded-full bg-brand-light px-2 py-0.5 text-xs text-brand-dark"
+                  className="flex items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-slate-50"
                 >
-                  {etiquetaPropiedad(p)}
-                  <button
-                    type="button"
-                    onClick={() => togglePropiedad(p.id)}
-                    className="font-bold text-brand-dark hover:text-red-600"
-                    aria-label={`Quitar ${etiquetaPropiedad(p)}`}
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-
-          <input
-            type="text"
-            value={busquedaPropiedad}
-            onChange={(e) => setBusquedaPropiedad(e.target.value)}
-            placeholder="Buscar por dirección o proyecto..."
-            className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-          />
-          <div className="mt-1 max-h-48 overflow-y-auto rounded-md border border-slate-300 bg-white">
-            {propiedadesFiltradas.map((p) => (
-              <label
-                key={p.id}
-                className="flex cursor-pointer items-center gap-2 border-b border-slate-100 px-3 py-2 text-sm last:border-b-0 hover:bg-slate-50"
-              >
-                <input
-                  type="checkbox"
-                  checked={propiedadesSeleccionadas.has(p.id)}
-                  onChange={() => togglePropiedad(p.id)}
-                  className="h-4 w-4 rounded border-slate-300"
-                />
-                {etiquetaPropiedad(p)}
-              </label>
-            ))}
-            {propiedadesFiltradas.length === 0 && (
-              <p className="px-3 py-2 text-sm text-slate-400">
-                No hay propiedades que coincidan con la búsqueda.
+                  <input
+                    type="checkbox"
+                    name="propiedad_ids"
+                    value={p.id}
+                    checked={seleccionadas.has(p.id)}
+                    onChange={() => toggleSeleccionada(p.id)}
+                    className="rounded border-slate-300"
+                  />
+                  <span className="text-slate-700">
+                    {p.direccion}
+                    {detalle ? <span className="text-slate-400"> · {detalle}</span> : null}
+                  </span>
+                </label>
+              );
+            })}
+            {propiedades.length === 0 && (
+              <p className="px-1.5 py-1 text-sm text-slate-400">
+                No hay propiedades cargadas todavía.
               </p>
             )}
           </div>
-          {/* Los checkboxes de arriba solo controlan el estado en React;
-              lo que realmente viaja en el formulario son estos hidden. */}
-          {Array.from(propiedadesSeleccionadas).map((id) => (
-            <input key={id} type="hidden" name="propiedad_ids" value={id} />
-          ))}
         </div>
-
         <div>
           <label className="block text-sm font-medium text-slate-700">Tipo</label>
           <select
@@ -238,7 +211,7 @@ export function ContratoForm({
             name="cantidad_cuotas"
             value={cantidadCuotas}
             readOnly={!esNuevo}
-            onChange={(e) => actualizarCantidadCuotas(Number(e.target.value))}
+            onChange={(e) => setCantidadCuotas(Math.max(1, Number(e.target.value) || 1))}
             className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
           />
         </div>
@@ -329,7 +302,7 @@ export function ContratoForm({
       ) : (
         <p className="mt-6 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-700">
           El plan de cuotas ya generado no se modifica desde aquí. Para ajustar montos
-          de cuotas puntuales, hazlo desde la sección &quot;Cuotas&quot;.
+          de cuotas puntuales, hazlo desde la sección "Cuotas".
         </p>
       )}
 

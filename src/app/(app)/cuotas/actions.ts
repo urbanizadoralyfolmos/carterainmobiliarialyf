@@ -9,6 +9,7 @@ export async function registrarPago(id: string, formData: FormData) {
 
   const montoPagado = Number(formData.get("monto_pagado") ?? 0);
   const montoCuota = Number(formData.get("monto_cuota") ?? 0);
+  const referencia = String(formData.get("referencia") ?? "").trim() || null;
 
   const { data: cuotaActual } = await supabase
     .from("cuotas")
@@ -27,6 +28,7 @@ export async function registrarPago(id: string, formData: FormData) {
       monto_pagado: montoPagado,
       estado,
       fecha_pago: fechaPago,
+      referencia,
     })
     .eq("id", id);
 
@@ -53,7 +55,7 @@ export async function revertirPago(id: string) {
 
   await supabase
     .from("cuotas")
-    .update({ monto_pagado: 0, estado: "pendiente", fecha_pago: null })
+    .update({ monto_pagado: 0, estado: "pendiente", fecha_pago: null, referencia: null })
     .eq("id", id);
 
   revalidatePath("/cuotas");

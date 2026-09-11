@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { formatMoney, formatDate, nombreCliente } from "@/lib/utils/format";
+import { formatMoney, formatDate } from "@/lib/utils/format";
 import { calcularMora } from "@/lib/utils/mora";
 
 function Card({
@@ -48,7 +48,7 @@ export default async function DashboardPage() {
     supabase
       .from("cuotas")
       .select(
-        "*, contratos(tasa_mora_mensual, moneda, clientes(nombre, apellido, tipo_persona, razon_social))"
+        "*, contratos(tasa_mora_mensual, moneda, clientes(nombre, apellido))"
       ),
   ]);
 
@@ -85,7 +85,7 @@ export default async function DashboardPage() {
     .sort((a, b) => a.fecha_vencimiento.localeCompare(b.fecha_vencimiento));
 
   const clientesEnMora = new Set(
-    cuotasVencidas.map((c) => (c.contratos?.clientes ? nombreCliente(c.contratos.clientes) : null))
+    cuotasVencidas.map((c) => c.contratos?.clientes?.nombre + c.contratos?.clientes?.apellido)
   ).size;
 
   const inicioMes = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-01`;
@@ -138,7 +138,9 @@ export default async function DashboardPage() {
             {cuotasVencidas.slice(0, 8).map((c) => (
               <li key={c.id} className="flex items-center justify-between py-2 text-sm">
                 <span className="text-slate-700">
-                  {c.contratos?.clientes ? nombreCliente(c.contratos.clientes) : "-"}{" "}
+                  {c.contratos?.clientes
+                    ? `${c.contratos.clientes.apellido}, ${c.contratos.clientes.nombre}`
+                    : "-"}{" "}
                   · cuota #{c.numero_cuota}
                 </span>
                 <span className="text-red-700">{c.diasMora} días</span>
@@ -164,7 +166,9 @@ export default async function DashboardPage() {
             {proximosVencimientos.slice(0, 8).map((c) => (
               <li key={c.id} className="flex items-center justify-between py-2 text-sm">
                 <span className="text-slate-700">
-                  {c.contratos?.clientes ? nombreCliente(c.contratos.clientes) : "-"}{" "}
+                  {c.contratos?.clientes
+                    ? `${c.contratos.clientes.apellido}, ${c.contratos.clientes.nombre}`
+                    : "-"}{" "}
                   · cuota #{c.numero_cuota}
                 </span>
                 <span className="text-slate-500">{formatDate(c.fecha_vencimiento)}</span>

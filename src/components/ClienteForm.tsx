@@ -12,49 +12,77 @@ export function ClienteForm({
   action: (formData: FormData) => void;
   error?: string;
 }) {
-  const [tipoPersona, setTipoPersona] = useState<"natural" | "juridica">(
-    cliente?.tipo_persona ?? "natural"
-  );
-  const esJuridica = tipoPersona === "juridica";
+  const [tipoPersona, setTipoPersona] = useState(cliente?.tipo_persona ?? "natural");
 
   return (
     <form action={action} className="mt-4 grid max-w-2xl grid-cols-2 gap-4">
       <div className="col-span-2">
         <label className="block text-sm font-medium text-slate-700">Tipo de cliente</label>
         <div className="mt-1 flex gap-2">
-          <button
-            type="button"
-            onClick={() => setTipoPersona("natural")}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-              !esJuridica
-                ? "bg-brand text-white"
-                : "border border-slate-300 text-slate-600 hover:bg-slate-50"
+          <label
+            className={`flex-1 cursor-pointer rounded-md border px-3 py-2 text-center text-sm ${
+              tipoPersona === "natural"
+                ? "border-brand bg-brand-light text-brand-dark"
+                : "border-slate-300 text-slate-600"
             }`}
           >
+            <input
+              type="radio"
+              name="tipo_persona"
+              value="natural"
+              checked={tipoPersona === "natural"}
+              onChange={() => setTipoPersona("natural")}
+              className="sr-only"
+            />
             Persona natural
-          </button>
-          <button
-            type="button"
-            onClick={() => setTipoPersona("juridica")}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-              esJuridica
-                ? "bg-brand text-white"
-                : "border border-slate-300 text-slate-600 hover:bg-slate-50"
+          </label>
+          <label
+            className={`flex-1 cursor-pointer rounded-md border px-3 py-2 text-center text-sm ${
+              tipoPersona === "juridica"
+                ? "border-brand bg-brand-light text-brand-dark"
+                : "border-slate-300 text-slate-600"
             }`}
           >
+            <input
+              type="radio"
+              name="tipo_persona"
+              value="juridica"
+              checked={tipoPersona === "juridica"}
+              onChange={() => setTipoPersona("juridica")}
+              className="sr-only"
+            />
             Persona jurídica
-          </button>
+          </label>
         </div>
-        {/* El backend decide qué campos guardar según este valor. */}
-        <input type="hidden" name="tipo_persona" value={tipoPersona} />
       </div>
 
-      {esJuridica ? (
+      <div>
+        <label className="block text-sm font-medium text-slate-700">
+          {tipoPersona === "juridica" ? "Nombre del representante" : "Nombre"}
+        </label>
+        <input
+          name="nombre"
+          defaultValue={cliente?.nombre}
+          required
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-slate-700">
+          {tipoPersona === "juridica" ? "Apellido del representante" : "Apellido"}
+        </label>
+        <input
+          name="apellido"
+          defaultValue={cliente?.apellido}
+          required
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+        />
+      </div>
+
+      {tipoPersona === "juridica" && (
         <>
           <div className="col-span-2">
-            <label className="block text-sm font-medium text-slate-700">
-              Nombre de la sociedad (razón social)
-            </label>
+            <label className="block text-sm font-medium text-slate-700">Razón social</label>
             <input
               name="razon_social"
               defaultValue={cliente?.razon_social ?? ""}
@@ -67,18 +95,7 @@ export function ClienteForm({
             <input
               name="nit"
               defaultValue={cliente?.nit ?? ""}
-              placeholder="Ej: 900123456-7"
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-          </div>
-          <div />
-          <div>
-            <label className="block text-sm font-medium text-slate-700">
-              Representante legal
-            </label>
-            <input
-              name="representante_nombre"
-              defaultValue={cliente?.representante_nombre ?? ""}
+              required
               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
             />
           </div>
@@ -93,43 +110,18 @@ export function ClienteForm({
             />
           </div>
         </>
-      ) : (
-        <>
-          <div>
-            <label className="block text-sm font-medium text-slate-700">Nombre</label>
-            <input
-              name="nombre"
-              defaultValue={cliente?.nombre ?? ""}
-              required
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700">Apellido</label>
-            <input
-              name="apellido"
-              defaultValue={cliente?.apellido ?? ""}
-              required
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700">Documento</label>
-            <input
-              name="documento"
-              defaultValue={cliente?.documento ?? ""}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-          </div>
-          <div />
-        </>
       )}
 
-      <div className="col-span-2 mt-2 border-t border-slate-200 pt-4">
-        <p className="text-xs font-medium uppercase text-slate-400">
-          {esJuridica ? "Datos de contacto de la sociedad" : "Datos de contacto"}
-        </p>
-      </div>
+      {tipoPersona === "natural" && (
+        <div>
+          <label className="block text-sm font-medium text-slate-700">Documento</label>
+          <input
+            name="documento"
+            defaultValue={cliente?.documento ?? ""}
+            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+          />
+        </div>
+      )}
       <div>
         <label className="block text-sm font-medium text-slate-700">Email</label>
         <input
@@ -147,7 +139,7 @@ export function ClienteForm({
           className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
         />
       </div>
-      <div className="col-span-2">
+      <div>
         <label className="block text-sm font-medium text-slate-700">Dirección</label>
         <input
           name="direccion"

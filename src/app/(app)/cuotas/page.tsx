@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { formatMoney, formatDate, formatPropiedadesLabel, nombreCliente, type PropiedadParaEtiqueta } from "@/lib/utils/format";
+import { formatMoney, formatDate } from "@/lib/utils/format";
 import { calcularMora } from "@/lib/utils/mora";
 import { registrarPago, revertirPago } from "./actions";
+import { SearchInput } from "@/components/SearchInput";
 
 const FILTROS = [
   { value: "todas", label: "Todas" },
@@ -14,15 +15,15 @@ const FILTROS = [
 export default async function CuotasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filtro?: string }>;
+  searchParams: Promise<{ filtro?: string; q?: string }>;
 }) {
-  const { filtro = "todas" } = await searchParams;
+  const { filtro = "todas", q } = await searchParams;
   const supabase = await createClient();
 
   const { data: cuotas, error } = await supabase
     .from("cuotas")
     .select(
-      "*, contratos(tasa_mora_mensual, moneda, clientes(nombre, apellido, tipo_persona, razon_social), contrato_propiedades(propiedades(direccion)))"
+      "*, contratos(tasa_mora_mensual, moneda, clientes(nombre, apellido), contrato_propiedades(propiedades(direccion)))"
     )
     .order("fecha_vencimiento", { ascending: true });
 
@@ -38,34 +39,54 @@ export default async function CuotasPage({
       tasa_mora_mensual: tasa,
     });
     const enMora = cuota.estado !== "pagada" && cuota.fecha_vencimiento < hoy;
-    return { ...cuota, diasMora, recargo, enMora };
+    const propiedadesTexto = (cuota.contratos?.contrato_propiedades ?? [])
+      .map((cp: { propiedades: { direccion: string } | null }) => cp.propiedades?.direccion)
+      .filter(Boolean)
+      .join(", ");
+    const nombreCliente = cuota.contratos?.clientes
+      ? `${cuota.contratos.clientes.apellido}, ${cuota.contratos.clientes.nombre}`
+      : "";
+    return { ...cuota, diasMora, recargo, enMora, propiedadesTexto, nombreCliente };
   });
 
-  const filtradas = enriquecidas.filter((c) => {
-    if (filtro === "todas") return true;
-    if (filtro === "vencida") return c.enMora;
-    if (filtro === "pendiente") return c.estado === "pendiente" && !c.enMora;
-    return c.estado === filtro;
-  });
+  const termino = (q ?? "").trim().toLowerCase();
+
+  const filtradas = enriquecidas
+    .filter((c) => {
+      if (filtro === "todas") return true;
+      if (filtro === "vencida") return c.enMora;
+      if (filtro === "pendiente") return c.estado === "pendiente" && !c.enMora;
+      return c.estado === filtro;
+    })
+    .filter((c) => {
+      if (!termino) return true;
+      return (
+        c.nombreCliente.toLowerCase().includes(termino) ||
+        c.propiedadesTexto.toLowerCase().includes(termino)
+      );
+    });
 
   return (
     <div>
       <h1 className="text-lg font-semibold text-slate-900">Cuotas</h1>
 
-      <div className="mt-3 flex gap-1">
-        {FILTROS.map((f) => (
-          <Link
-            key={f.value}
-            href={`/cuotas?filtro=${f.value}`}
-            className={`rounded-md px-3 py-1.5 text-sm ${
-              filtro === f.value
-                ? "bg-brand text-white"
-                : "text-slate-600 hover:bg-slate-100"
-            }`}
-          >
-            {f.label}
-          </Link>
-        ))}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <SearchInput placeholder="Buscar por cliente o propiedad..." />
+        <div className="flex flex-wrap gap-1">
+          {FILTROS.map((f) => (
+            <Link
+              key={f.value}
+              href={`/cuotas?filtro=${f.value}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+              className={`rounded-md px-3 py-1.5 text-sm ${
+                filtro === f.value
+                  ? "bg-brand text-white"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              {f.label}
+            </Link>
+          ))}
+        </div>
       </div>
 
       {error && (
@@ -94,15 +115,9 @@ export default async function CuotasPage({
               return (
                 <tr key={c.id} className={c.enMora ? "bg-red-50/50" : ""}>
                   <td className="px-4 py-2 font-medium text-slate-900">
-                    {c.contratos?.clientes ? nombreCliente(c.contratos.clientes) : "-"}
+                    {c.nombreCliente || "-"}
                   </td>
-                  <td className="px-4 py-2 text-slate-600">
-                    {formatPropiedadesLabel(
-                      (c.contratos?.contrato_propiedades ?? []).map(
-                        (cp: { propiedades: PropiedadParaEtiqueta }) => cp.propiedades
-                      )
-                    )}
-                  </td>
+                  <td className="px-4 py-2 text-slate-600">{c.propiedadesTexto || "-"}</td>
                   <td className="px-4 py-2 text-slate-600">{c.numero_cuota === 0 ? "Inicial" : `#${c.numero_cuota}`}</td>
                   <td className="px-4 py-2 text-slate-600">
                     {formatDate(c.fecha_vencimiento)}
@@ -138,6 +153,11 @@ export default async function CuotasPage({
                     >
                       {c.enMora ? "vencida" : c.estado}
                     </span>
+                    {c.referencia && (
+                      <span className="block text-[10px] text-slate-400">
+                        ref. {c.referencia}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-2 text-right">
                     {c.estado === "pagada" || c.estado === "parcial" ? (
@@ -171,6 +191,13 @@ export default async function CuotasPage({
                           step="0.01"
                           name="monto_pagado"
                           defaultValue={c.monto + c.recargo}
+                          className="w-24 rounded-md border border-slate-300 px-2 py-1 text-xs"
+                        />
+                        <input
+                          type="text"
+                          name="referencia"
+                          placeholder="Referencia"
+                          defaultValue={c.referencia ?? ""}
                           className="w-24 rounded-md border border-slate-300 px-2 py-1 text-xs"
                         />
                         <button
