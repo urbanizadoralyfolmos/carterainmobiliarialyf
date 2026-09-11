@@ -100,6 +100,6 @@ export async function getEstadoCuentaContrato(id: string) {
   return { contrato, cliente, nombreCliente, propiedades, resumen };
 }
 
-export type EstadoCuentaContrato = NonNullable
+export type EstadoCuentaContrato = NonNullable<
   Awaited<ReturnType<typeof getEstadoCuentaContrato>>
 >;
