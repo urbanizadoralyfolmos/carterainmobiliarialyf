@@ -29,7 +29,7 @@ export default async function ContratosPage({
   const { data: contratos, error } = await supabase
     .from("contratos")
     .select(
-      "*, clientes(nombre, apellido, razon_social, tipo_persona), contrato_propiedades(propiedades(direccion, manzana, numero_lote, proyectos(nombre)))"
+      "*, clientes(nombre, apellido, razon_social, tipo_persona, documento, nit), contrato_propiedades(propiedades(direccion, manzana, numero_lote, proyectos(nombre)))"
     )
     .order("created_at", { ascending: false });
 
@@ -55,18 +55,30 @@ export default async function ContratosPage({
           : c.clientes
           ? `${c.clientes.apellido}, ${c.clientes.nombre}`
           : "";
-      return { ...c, propiedades, nombreCliente };
+      const documento =
+        c.clientes?.tipo_persona === "juridica" ? c.clientes?.nit : c.clientes?.documento;
+      return { ...c, propiedades, nombreCliente, documento };
     })
     .filter((c) => estado === "todos" || c.estado === estado)
     .filter((c) => {
       if (!termino) return true;
-      const enDireccion = c.propiedades.some((p: PropiedadRelContrato) =>
-        p.direccion.toLowerCase().includes(termino)
-      );
+      const enPropiedad = c.propiedades.some((p: PropiedadRelContrato) => {
+        const proyectoRel = p.proyectos;
+        const proyectoNombre = Array.isArray(proyectoRel)
+          ? proyectoRel[0]?.nombre
+          : proyectoRel?.nombre;
+        return (
+          p.direccion.toLowerCase().includes(termino) ||
+          (p.manzana ?? "").toLowerCase().includes(termino) ||
+          (p.numero_lote ?? "").toLowerCase().includes(termino) ||
+          (proyectoNombre ?? "").toLowerCase().includes(termino)
+        );
+      });
       return (
         c.nombreCliente.toLowerCase().includes(termino) ||
+        (c.documento ?? "").toLowerCase().includes(termino) ||
         String(c.numero).includes(termino) ||
-        enDireccion
+        enPropiedad
       );
     });
 
@@ -83,7 +95,7 @@ export default async function ContratosPage({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <SearchInput placeholder="Buscar por cliente, N.º de contrato o lote..." />
+        <SearchInput placeholder="Buscar por cliente, documento, N.º de contrato, proyecto o lote..." />
         <div className="flex flex-wrap gap-1">
           {ESTADOS.map((e) => (
             <Link
