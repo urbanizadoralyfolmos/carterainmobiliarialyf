@@ -20,7 +20,7 @@ export async function getEstadoCuentaContrato(id: string) {
   const { data: contrato } = await supabase
     .from("contratos")
     .select(
-      "*, clientes(*), contrato_propiedades(propiedades(direccion, manzana, numero_lote, proyectos(nombre))), cuotas(id, numero_cuota, fecha_vencimiento, monto, monto_pagado, estado, fecha_pago, referencia)"
+      "*, clientes(*), contrato_propiedades(propiedades(direccion, manzana, numero_lote, proyectos(nombre))), cuotas(id, numero_cuota, fecha_vencimiento, monto, monto_pagado, estado, fecha_pago, referencia, recibos(numero))"
     )
     .eq("id", id)
     .single();
@@ -33,6 +33,41 @@ export async function getEstadoCuentaContrato(id: string) {
     numero_lote: string | null;
     proyectos?: { nombre: string } | { nombre: string }[] | null;
   };
+
+  type CuotaRel = {
+    id: string;
+    numero_cuota: number;
+    fecha_vencimiento: string;
+    monto: number;
+    monto_pagado: number;
+    estado: string;
+    fecha_pago: string | null;
+    referencia: string | null;
+    recibos?: { numero: number } | { numero: number }[] | null;
+  };
+
+  // El número de recibo lo genera el aplicativo (secuencial, tabla `recibos`)
+  // y es distinto de la referencia de pago capturada manualmente. Una cuota
+  // puede tener más de un recibo asociado (pagos parciales); si es así se
+  // muestran todos separados por coma.
+  const cuotasConRecibo = ((contrato.cuotas ?? []) as CuotaRel[]).map((c) => {
+    const recibosRel = c.recibos;
+    const recibosArr = Array.isArray(recibosRel)
+      ? recibosRel
+      : recibosRel
+      ? [recibosRel]
+      : [];
+    const numero_recibo =
+      recibosArr.length > 0
+        ? recibosArr
+            .map((r) => r.numero)
+            .sort((a, b) => a - b)
+            .join(", ")
+        : null;
+    const { recibos: _recibos, ...cuota } = c;
+    void _recibos;
+    return { ...cuota, numero_recibo };
+  });
 
   const propiedades: PropiedadResumen[] = (
     (contrato.contrato_propiedades ?? []) as { propiedades: PropiedadRel | null }[]
@@ -60,11 +95,11 @@ export async function getEstadoCuentaContrato(id: string) {
       ? `${cliente.apellido}, ${cliente.nombre}`
       : "Cliente sin datos";
 
-  const resumen = resumenCuotas(contrato.cuotas ?? [], contrato.tasa_mora_mensual);
+  const resumen = resumenCuotas(cuotasConRecibo, contrato.tasa_mora_mensual);
 
   return { contrato, cliente, nombreCliente, propiedades, resumen };
 }
 
-export type EstadoCuentaContrato = NonNullable<
+export type EstadoCuentaContrato = NonNullable
   Awaited<ReturnType<typeof getEstadoCuentaContrato>>
 >;
