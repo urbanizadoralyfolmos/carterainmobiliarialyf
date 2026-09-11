@@ -24,13 +24,14 @@ const styles = StyleSheet.create({
   },
   th: { color: "#ffffff", fontSize: 8, fontWeight: "bold", paddingHorizontal: 3 },
   td: { fontSize: 8, color: "#334155", paddingHorizontal: 3 },
-  colCuota: { width: "7%" },
-  colFecha: { width: "13%" },
-  colMonto: { width: "14%" },
-  colPagado: { width: "14%" },
-  colMora: { width: "12%" },
-  colFechaPago: { width: "13%" },
-  colRef: { width: "16%" },
+  colCuota: { width: "6%" },
+  colFecha: { width: "12%" },
+  colMonto: { width: "13%" },
+  colPagado: { width: "13%" },
+  colMora: { width: "10%" },
+  colFechaPago: { width: "12%" },
+  colRef: { width: "13%" },
+  colRecibo: { width: "10%" },
   colEstado: { width: "11%" },
 });
 
@@ -115,6 +116,7 @@ export async function GET(
             <Text style={[styles.th, styles.colMora]}>Mora</Text>
             <Text style={[styles.th, styles.colFechaPago]}>Fecha pago</Text>
             <Text style={[styles.th, styles.colRef]}>Referencia</Text>
+            <Text style={[styles.th, styles.colRecibo]}>N.º Recibo</Text>
             <Text style={[styles.th, styles.colEstado]}>Estado</Text>
           </View>
           {detalle.map((c) => (
@@ -134,6 +136,7 @@ export async function GET(
               </Text>
               <Text style={[styles.td, styles.colFechaPago]}>{formatDate(c.fecha_pago)}</Text>
               <Text style={[styles.td, styles.colRef]}>{c.referencia ?? "-"}</Text>
+              <Text style={[styles.td, styles.colRecibo]}>{c.numero_recibo ?? "-"}</Text>
               <Text style={[styles.td, styles.colEstado]}>{c.estado}</Text>
             </View>
           ))}
