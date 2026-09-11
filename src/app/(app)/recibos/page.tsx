@@ -1,19 +1,27 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatMoney, formatDate } from "@/lib/utils/format";
+import { SearchInput } from "@/components/SearchInput";
+
+type ProyectoRel = { nombre: string } | { nombre: string }[] | null | undefined;
+
+function nombreProyecto(rel: ProyectoRel) {
+  if (Array.isArray(rel)) return rel[0]?.nombre ?? "";
+  return rel?.nombre ?? "";
+}
 
 export default async function RecibosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ cuota?: string }>;
+  searchParams: Promise<{ cuota?: string; q?: string }>;
 }) {
-  const { cuota } = await searchParams;
+  const { cuota, q } = await searchParams;
   const supabase = await createClient();
 
   let query = supabase
     .from("recibos")
     .select(
-      "*, cuotas(numero_cuota, contratos(numero, moneda, clientes(nombre, apellido), contrato_propiedades(propiedades(direccion))))"
+      "*, cuotas(numero_cuota, contratos(numero, moneda, clientes(nombre, apellido, razon_social, tipo_persona, documento, nit), contrato_propiedades(propiedades(direccion, proyectos(nombre)))))"
     )
     .order("created_at", { ascending: false });
 
@@ -21,7 +29,53 @@ export default async function RecibosPage({
     query = query.eq("cuota_id", cuota);
   }
 
-  const { data: recibos } = await query;
+  const { data: recibos, error } = await query;
+
+  const enriquecidos = (recibos ?? []).map((r) => {
+    const c = r.cuotas;
+    const contrato = c?.contratos;
+    const cliente = contrato?.clientes;
+    const nombreCliente =
+      cliente?.tipo_persona === "juridica" && cliente?.razon_social
+        ? cliente.razon_social
+        : cliente
+        ? `${cliente.apellido}, ${cliente.nombre}`
+        : "";
+    const documento = cliente?.tipo_persona === "juridica" ? cliente?.nit : cliente?.documento;
+    const propiedadesRel = (contrato?.contrato_propiedades ?? []) as {
+      propiedades: { direccion: string; proyectos?: ProyectoRel } | null;
+    }[];
+    const propiedadesTexto = propiedadesRel
+      .map((cp) => cp.propiedades?.direccion)
+      .filter(Boolean)
+      .join(", ");
+    const proyectosTexto = propiedadesRel
+      .map((cp) => nombreProyecto(cp.propiedades?.proyectos))
+      .filter(Boolean)
+      .join(", ");
+    return {
+      ...r,
+      nombreCliente,
+      documento,
+      propiedadesTexto,
+      proyectosTexto,
+      numeroContrato: contrato?.numero,
+    };
+  });
+
+  const termino = (q ?? "").trim().toLowerCase();
+
+  const filtrados = enriquecidos.filter((r) => {
+    if (!termino) return true;
+    return (
+      r.nombreCliente.toLowerCase().includes(termino) ||
+      (r.documento ?? "").toLowerCase().includes(termino) ||
+      r.propiedadesTexto.toLowerCase().includes(termino) ||
+      r.proyectosTexto.toLowerCase().includes(termino) ||
+      String(r.numeroContrato ?? "").includes(termino) ||
+      String(r.numero).includes(termino)
+    );
+  });
 
   return (
     <div>
@@ -33,6 +87,16 @@ export default async function RecibosPage({
           </Link>
         )}
       </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <SearchInput placeholder="Buscar por cliente, documento, propiedad, proyecto, N.º de contrato o de recibo..." />
+      </div>
+
+      {error && (
+        <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error.message}
+        </p>
+      )}
 
       <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white">
         <table className="min-w-full divide-y divide-slate-200 text-sm">
@@ -48,23 +112,16 @@ export default async function RecibosPage({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {recibos?.map((r) => {
+            {filtrados.map((r) => {
               const c = r.cuotas;
               const contrato = c?.contratos;
               const moneda = contrato?.moneda ?? "COP";
-              const propiedades = (contrato?.contrato_propiedades ?? [])
-                .map((cp: { propiedades: { direccion: string } | null }) => cp.propiedades?.direccion)
-                .filter(Boolean);
               return (
                 <tr key={r.id}>
                   <td className="px-4 py-2 font-medium text-slate-900">{r.numero}</td>
+                  <td className="px-4 py-2 text-slate-600">{r.nombreCliente || "-"}</td>
                   <td className="px-4 py-2 text-slate-600">
-                    {contrato?.clientes
-                      ? `${contrato.clientes.apellido}, ${contrato.clientes.nombre}`
-                      : "-"}
-                  </td>
-                  <td className="px-4 py-2 text-slate-600">
-                    {propiedades.length > 0 ? propiedades.join(", ") : "-"}
+                    {r.propiedadesTexto || "-"}
                   </td>
                   <td className="px-4 py-2 text-slate-600">
                     {c?.numero_cuota === 0 ? "Inicial" : `#${c?.numero_cuota}`}
@@ -82,10 +139,12 @@ export default async function RecibosPage({
                 </tr>
               );
             })}
-            {(!recibos || recibos.length === 0) && (
+            {filtrados.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-4 py-6 text-center text-slate-400">
-                  Todavía no hay recibos registrados.
+                  {recibos?.length === 0
+                    ? "Todavía no hay recibos registrados."
+                    : "Ningún recibo coincide con la búsqueda."}
                 </td>
               </tr>
             )}
