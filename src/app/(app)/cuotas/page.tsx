@@ -12,6 +12,13 @@ const FILTROS = [
   { value: "pagada", label: "Pagadas" },
 ];
 
+type ProyectoRel = { nombre: string } | { nombre: string }[] | null | undefined;
+
+function nombreProyecto(rel: ProyectoRel) {
+  if (Array.isArray(rel)) return rel[0]?.nombre ?? "";
+  return rel?.nombre ?? "";
+}
+
 export default async function CuotasPage({
   searchParams,
 }: {
@@ -23,7 +30,7 @@ export default async function CuotasPage({
   const { data: cuotas, error } = await supabase
     .from("cuotas")
     .select(
-      "*, contratos(tasa_mora_mensual, moneda, clientes(nombre, apellido), contrato_propiedades(propiedades(direccion)))"
+      "*, contratos(numero, tasa_mora_mensual, moneda, clientes(nombre, apellido, razon_social, tipo_persona, documento, nit), contrato_propiedades(propiedades(direccion, proyectos(nombre))))"
     )
     .order("fecha_vencimiento", { ascending: true });
 
@@ -39,14 +46,37 @@ export default async function CuotasPage({
       tasa_mora_mensual: tasa,
     });
     const enMora = cuota.estado !== "pagada" && cuota.fecha_vencimiento < hoy;
-    const propiedadesTexto = (cuota.contratos?.contrato_propiedades ?? [])
-      .map((cp: { propiedades: { direccion: string } | null }) => cp.propiedades?.direccion)
+    const propiedadesRel = (cuota.contratos?.contrato_propiedades ?? []) as {
+      propiedades: { direccion: string; proyectos?: ProyectoRel } | null;
+    }[];
+    const propiedadesTexto = propiedadesRel
+      .map((cp) => cp.propiedades?.direccion)
       .filter(Boolean)
       .join(", ");
-    const nombreCliente = cuota.contratos?.clientes
-      ? `${cuota.contratos.clientes.apellido}, ${cuota.contratos.clientes.nombre}`
-      : "";
-    return { ...cuota, diasMora, recargo, enMora, propiedadesTexto, nombreCliente };
+    const proyectosTexto = propiedadesRel
+      .map((cp) => nombreProyecto(cp.propiedades?.proyectos))
+      .filter(Boolean)
+      .join(", ");
+    const cliente = cuota.contratos?.clientes;
+    const nombreCliente =
+      cliente?.tipo_persona === "juridica" && cliente?.razon_social
+        ? cliente.razon_social
+        : cliente
+        ? `${cliente.apellido}, ${cliente.nombre}`
+        : "";
+    const documento = cliente?.tipo_persona === "juridica" ? cliente?.nit : cliente?.documento;
+    const numeroContrato = cuota.contratos?.numero;
+    return {
+      ...cuota,
+      diasMora,
+      recargo,
+      enMora,
+      propiedadesTexto,
+      proyectosTexto,
+      nombreCliente,
+      documento,
+      numeroContrato,
+    };
   });
 
   const termino = (q ?? "").trim().toLowerCase();
@@ -62,7 +92,11 @@ export default async function CuotasPage({
       if (!termino) return true;
       return (
         c.nombreCliente.toLowerCase().includes(termino) ||
-        c.propiedadesTexto.toLowerCase().includes(termino)
+        (c.documento ?? "").toLowerCase().includes(termino) ||
+        c.propiedadesTexto.toLowerCase().includes(termino) ||
+        c.proyectosTexto.toLowerCase().includes(termino) ||
+        String(c.numeroContrato ?? "").includes(termino) ||
+        (c.referencia ?? "").toLowerCase().includes(termino)
       );
     });
 
@@ -71,7 +105,7 @@ export default async function CuotasPage({
       <h1 className="text-lg font-semibold text-slate-900">Cuotas</h1>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <SearchInput placeholder="Buscar por cliente o propiedad..." />
+        <SearchInput placeholder="Buscar por cliente, documento, propiedad, proyecto, N.º de contrato o referencia..." />
         <div className="flex flex-wrap gap-1">
           {FILTROS.map((f) => (
             <Link
