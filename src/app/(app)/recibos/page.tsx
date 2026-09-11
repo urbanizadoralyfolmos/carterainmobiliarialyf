@@ -106,6 +106,7 @@ export default async function RecibosPage({
               <th className="px-4 py-2">Cliente</th>
               <th className="px-4 py-2">Propiedad</th>
               <th className="px-4 py-2">Proyecto</th>
+              <th className="px-4 py-2">Contrato</th>
               <th className="px-4 py-2">Cuota</th>
               <th className="px-4 py-2">Fecha de pago</th>
               <th className="px-4 py-2">Monto</th>
@@ -128,6 +129,9 @@ export default async function RecibosPage({
                     {r.proyectosTexto || "-"}
                   </td>
                   <td className="px-4 py-2 text-slate-600">
+                    {r.numeroContrato ? `N.º ${r.numeroContrato}` : "-"}
+                  </td>
+                  <td className="px-4 py-2 text-slate-600">
                     {c?.numero_cuota === 0 ? "Inicial" : `#${c?.numero_cuota}`}
                   </td>
                   <td className="px-4 py-2 text-slate-600">{formatDate(r.fecha_pago)}</td>
@@ -145,7 +149,7 @@ export default async function RecibosPage({
             })}
             {filtrados.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-6 text-center text-slate-400">
+                <td colSpan={9} className="px-4 py-6 text-center text-slate-400">
                   {recibos?.length === 0
                     ? "Todavía no hay recibos registrados."
                     : "Ningún recibo coincide con la búsqueda."}
