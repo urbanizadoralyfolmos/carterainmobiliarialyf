@@ -16,8 +16,9 @@ export async function GET(
     return NextResponse.json({ error: "Contrato no encontrado" }, { status: 404 });
   }
 
-  const { contrato, cliente, nombreCliente, propiedades, resumen } = data;
+  const { contrato, cliente, nombreCliente, propiedades, resumen, cuotasPendientes } = data;
   const detalle = [...resumen.detalle].sort((a, b) => a.numero_cuota - b.numero_cuota);
+  const totalSaldoPendiente = cuotasPendientes.reduce((acc, c) => acc + c.saldo, 0);
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Urbanizadora LYF Olmos";
@@ -133,6 +134,57 @@ export async function GET(
     row.getCell(8).value = c.numero_recibo ?? "-";
     row.getCell(9).value = c.estado;
   });
+
+  const pendientesSheet = workbook.addWorksheet("Cuotas pendientes");
+  pendientesSheet.columns = [
+    { width: 12 },
+    { width: 16 },
+    { width: 16 },
+    { width: 16 },
+    { width: 16 },
+    { width: 16 },
+    { width: 14 },
+  ];
+
+  pendientesSheet.mergeCells("A1:G1");
+  pendientesSheet.getCell("A1").value = `Cuotas pendientes de pago - Contrato N.º ${contrato.numero}`;
+  pendientesSheet.getCell("A1").font = { bold: true, size: 14 };
+
+  const pHeaders = ["Cuota", "Vencimiento", "Monto", "Pagado", "Saldo", "Mora", "Estado"];
+  const pHeaderRow = pendientesSheet.getRow(3);
+  pHeaders.forEach((h, i) => {
+    const cell = pHeaderRow.getCell(i + 1);
+    cell.value = h;
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E9BD7" } };
+    cell.alignment = { vertical: "middle" };
+  });
+
+  if (cuotasPendientes.length > 0) {
+    cuotasPendientes.forEach((c, idx) => {
+      const row = pendientesSheet.getRow(4 + idx);
+      row.getCell(1).value = c.numero_cuota === 0 ? "Inicial" : `#${c.numero_cuota}`;
+      row.getCell(2).value = formatDate(c.fecha_vencimiento);
+      row.getCell(3).value = c.monto;
+      row.getCell(3).numFmt = "#,##0";
+      row.getCell(4).value = c.monto_pagado;
+      row.getCell(4).numFmt = "#,##0";
+      row.getCell(5).value = c.saldo;
+      row.getCell(5).numFmt = "#,##0";
+      row.getCell(6).value = c.recargo;
+      row.getCell(6).numFmt = "#,##0";
+      row.getCell(7).value = c.estado;
+    });
+
+    const totalRow = pendientesSheet.getRow(4 + cuotasPendientes.length + 1);
+    totalRow.getCell(4).value = "Total pendiente:";
+    totalRow.getCell(4).font = { bold: true };
+    totalRow.getCell(5).value = totalSaldoPendiente;
+    totalRow.getCell(5).numFmt = "#,##0";
+    totalRow.getCell(5).font = { bold: true };
+  } else {
+    pendientesSheet.getCell("A4").value = "Este contrato no tiene cuotas pendientes de pago.";
+  }
 
   const buffer = await workbook.xlsx.writeBuffer();
 
