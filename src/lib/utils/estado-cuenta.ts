@@ -9,6 +9,7 @@ export type CuotaResumen = {
   estado: string;
   fecha_pago: string | null;
   referencia?: string | null;
+  numero_recibo?: string | null;
 };
 
 export type CuotaConMora = CuotaResumen & { diasMora: number; recargo: number };
