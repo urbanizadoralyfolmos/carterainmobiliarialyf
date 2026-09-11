@@ -11,6 +11,11 @@ const ESTADO_LABELS: Record<string, string> = {
   cancelado: "Cancelado",
 };
 
+const DOWNLOAD_LINKS = [
+  { tipo: "excel", etiqueta: "Descargar Excel" },
+  { tipo: "pdf", etiqueta: "Descargar PDF" },
+];
+
 export default async function EstadoCuentaContratoPage({
   params,
 }: {
@@ -31,18 +36,15 @@ export default async function EstadoCuentaContratoPage({
           ← Volver al contrato
         </Link>
         <div className="flex gap-2">
-          
-            href={`/api/contratos/${id}/estado-cuenta/excel`}
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
-          >
-            Descargar Excel
-          </a>
-          
-            href={`/api/contratos/${id}/estado-cuenta/pdf`}
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
-          >
-            Descargar PDF
-          </a>
+          {DOWNLOAD_LINKS.map((link) => (
+            <a
+              key={link.tipo}
+              href={`/api/contratos/${id}/estado-cuenta/${link.tipo}`}
+              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
+            >
+              {link.etiqueta}
+            </a>
+          ))}
           <PrintButton />
         </div>
       </div>
