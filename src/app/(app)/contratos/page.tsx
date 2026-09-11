@@ -131,7 +131,7 @@ export default async function ContratosPage({
               <th className="px-4 py-2">Cliente</th>
               <th className="px-4 py-2">Propiedad(es)</th>
               <th className="px-4 py-2">Tipo</th>
-              <th className="px-4 py-2">Cuota inicial</th>
+              <th className="px-4 py-2">Valor total</th>
               <th className="px-4 py-2">Cuotas</th>
               <th className="px-4 py-2">Inicio</th>
               <th className="px-4 py-2">Estado</th>
@@ -164,7 +164,7 @@ export default async function ContratosPage({
                   </td>
                   <td className="px-4 py-2 text-slate-600 capitalize">{c.tipo}</td>
                   <td className="px-4 py-2 text-slate-600">
-                    {formatMoney(c.cuota_inicial, c.moneda)}
+                    {formatMoney(c.monto_total, c.moneda)}
                   </td>
                   <td className="px-4 py-2 text-slate-600">{c.cantidad_cuotas}</td>
                   <td className="px-4 py-2 text-slate-600">{formatDate(c.fecha_inicio)}</td>
