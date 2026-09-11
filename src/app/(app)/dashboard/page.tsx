@@ -48,7 +48,7 @@ export default async function DashboardPage() {
     supabase
       .from("cuotas")
       .select(
-        "*, contratos(tasa_mora_mensual, moneda, clientes(nombre, apellido))"
+        "*, contratos(moneda, clientes(nombre, apellido))"
       ),
   ]);
 
@@ -57,21 +57,17 @@ export default async function DashboardPage() {
   const en7dias = new Date(hoy.getTime() + 7 * 86400000).toISOString().slice(0, 10);
 
   const cuotasEnriquecidas = (cuotas ?? []).map((c) => {
-    const tasa = c.contratos?.tasa_mora_mensual ?? 0;
-    const { diasMora, recargo } = calcularMora({
+    const { diasMora } = calcularMora({
       fecha_vencimiento: c.fecha_vencimiento,
-      monto: c.monto,
-      monto_pagado: c.monto_pagado,
       estado: c.estado,
-      tasa_mora_mensual: tasa,
     });
     const enMora = c.estado !== "pagada" && c.fecha_vencimiento < hoyStr;
-    return { ...c, diasMora, recargo, enMora };
+    return { ...c, diasMora, enMora };
   });
 
   const cuotasVencidas = cuotasEnriquecidas.filter((c) => c.enMora);
   const montoVencido = cuotasVencidas.reduce(
-    (acc, c) => acc + (c.monto - c.monto_pagado) + c.recargo,
+    (acc, c) => acc + (c.monto - c.monto_pagado),
     0
   );
 
@@ -121,7 +117,7 @@ export default async function DashboardPage() {
 
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card
-          label="Monto total vencido (con recargo)"
+          label="Monto total vencido"
           value={formatMoney(montoVencido)}
           tone={montoVencido > 0 ? "danger" : "success"}
         />

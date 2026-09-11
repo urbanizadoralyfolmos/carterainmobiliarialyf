@@ -71,7 +71,7 @@ export default async function EstadoCuentaPropiedadPage({
     return {
       ...contrato,
       cliente,
-      resumen: resumenCuotas(contrato.cuotas ?? [], contrato.tasa_mora_mensual),
+      resumen: resumenCuotas(contrato.cuotas ?? []),
     };
   });
 
@@ -133,7 +133,6 @@ export default async function EstadoCuentaPropiedadPage({
                   <th className="py-1">Vencimiento</th>
                   <th className="py-1">Monto</th>
                   <th className="py-1">Pagado</th>
-                  <th className="py-1">Mora</th>
                   <th className="py-1">Estado</th>
                 </tr>
               </thead>
@@ -149,9 +148,6 @@ export default async function EstadoCuentaPropiedadPage({
                       </td>
                       <td className="py-1 text-slate-600">
                         {formatMoney(c.monto_pagado, contrato.moneda)}
-                      </td>
-                      <td className="py-1 text-slate-600">
-                        {c.recargo > 0 ? formatMoney(c.recargo, contrato.moneda) : "-"}
                       </td>
                       <td className="py-1 text-slate-600">{c.estado}</td>
                     </tr>

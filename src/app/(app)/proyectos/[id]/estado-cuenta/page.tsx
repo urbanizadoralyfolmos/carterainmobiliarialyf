@@ -41,7 +41,7 @@ export default async function ReporteProyectoPage({
     );
     const contrato = contratosOrdenados.find((c) => c.estado !== "cancelado") ?? null;
     const resumen = contrato
-      ? resumenCuotas(contrato.cuotas ?? [], contrato.tasa_mora_mensual)
+      ? resumenCuotas(contrato.cuotas ?? [])
       : null;
     return { propiedad: p, contrato, resumen };
   });

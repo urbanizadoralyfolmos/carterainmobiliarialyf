@@ -30,20 +30,16 @@ export default async function CuotasPage({
   const { data: cuotas, error } = await supabase
     .from("cuotas")
     .select(
-      "*, contratos(numero, tasa_mora_mensual, moneda, clientes(nombre, apellido, razon_social, tipo_persona, documento, nit), contrato_propiedades(propiedades(direccion, proyectos(nombre))))"
+      "*, contratos(numero, moneda, clientes(nombre, apellido, razon_social, tipo_persona, documento, nit), contrato_propiedades(propiedades(direccion, proyectos(nombre))))"
     )
     .order("fecha_vencimiento", { ascending: true });
 
   const hoy = new Date().toISOString().slice(0, 10);
 
   const enriquecidas = (cuotas ?? []).map((cuota) => {
-    const tasa = cuota.contratos?.tasa_mora_mensual ?? 0;
-    const { diasMora, recargo } = calcularMora({
+    const { diasMora } = calcularMora({
       fecha_vencimiento: cuota.fecha_vencimiento,
-      monto: cuota.monto,
-      monto_pagado: cuota.monto_pagado,
       estado: cuota.estado,
-      tasa_mora_mensual: tasa,
     });
     const enMora = cuota.estado !== "pagada" && cuota.fecha_vencimiento < hoy;
     const propiedadesRel = (cuota.contratos?.contrato_propiedades ?? []) as {
@@ -69,7 +65,6 @@ export default async function CuotasPage({
     return {
       ...cuota,
       diasMora,
-      recargo,
       enMora,
       propiedadesTexto,
       proyectosTexto,
@@ -138,7 +133,7 @@ export default async function CuotasPage({
               <th className="px-4 py-2">Cuota</th>
               <th className="px-4 py-2">Vencimiento</th>
               <th className="px-4 py-2">Monto</th>
-              <th className="px-4 py-2">Mora</th>
+              <th className="px-4 py-2">Días vencida</th>
               <th className="px-4 py-2">Estado</th>
               <th className="px-4 py-2 text-right">Acción</th>
             </tr>
@@ -166,9 +161,7 @@ export default async function CuotasPage({
                   </td>
                   <td className="px-4 py-2">
                     {c.enMora ? (
-                      <span className="text-red-700">
-                        {c.diasMora} días · {formatMoney(c.recargo, moneda)}
-                      </span>
+                      <span className="text-red-700">{c.diasMora} días</span>
                     ) : (
                       <span className="text-slate-400">-</span>
                     )}
@@ -224,7 +217,7 @@ export default async function CuotasPage({
                           type="number"
                           step="0.01"
                           name="monto_pagado"
-                          defaultValue={c.monto + c.recargo}
+                          defaultValue={c.monto}
                           className="w-24 rounded-md border border-slate-300 px-2 py-1 text-xs"
                         />
                         <input

@@ -101,7 +101,7 @@ export async function getEstadoCuentaContrato(id: string) {
   // valor), y sumar solo lo cargado subestima gravemente el total. Se usa
   // la suma de cuotas únicamente como respaldo si el contrato no tiene
   // monto_total guardado.
-  const resumenCalculado = resumenCuotas(cuotasConRecibo, contrato.tasa_mora_mensual);
+  const resumenCalculado = resumenCuotas(cuotasConRecibo);
   const totalMonto = contrato.monto_total ?? resumenCalculado.totalMonto;
   const resumen = {
     ...resumenCalculado,

@@ -12,26 +12,25 @@ export type CuotaResumen = {
   numero_recibo?: string | null;
 };
 
-export type CuotaConMora = CuotaResumen & { diasMora: number; recargo: number };
+export type CuotaConMora = CuotaResumen & { diasMora: number };
 
-/** Calcula totales (monto, pagado, pendiente, mora) de un conjunto de cuotas. */
-export function resumenCuotas(cuotas: CuotaResumen[], tasaMoraMensual: number) {
+/**
+ * Calcula totales (monto, pagado, pendiente) de un conjunto de cuotas.
+ * No aplica ninguna tasa de mora ni calcula recargos en dinero: `diasMora`
+ * es solo informativo, para saber hace cuánto está vencida una cuota.
+ */
+export function resumenCuotas(cuotas: CuotaResumen[]) {
   let totalMonto = 0;
   let totalPagado = 0;
-  let totalMora = 0;
 
   const detalle: CuotaConMora[] = cuotas.map((c) => {
-    const { diasMora, recargo } = calcularMora({
+    const { diasMora } = calcularMora({
       fecha_vencimiento: c.fecha_vencimiento,
-      monto: c.monto,
-      monto_pagado: c.monto_pagado,
       estado: c.estado,
-      tasa_mora_mensual: tasaMoraMensual,
     });
     totalMonto += c.monto;
     totalPagado += c.monto_pagado;
-    totalMora += recargo;
-    return { ...c, diasMora, recargo };
+    return { ...c, diasMora };
   });
 
   return {
@@ -39,6 +38,5 @@ export function resumenCuotas(cuotas: CuotaResumen[], tasaMoraMensual: number) {
     totalMonto,
     totalPagado,
     totalPendiente: Math.max(0, totalMonto - totalPagado),
-    totalMora,
   };
 }

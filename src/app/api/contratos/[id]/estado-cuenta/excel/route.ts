@@ -30,7 +30,6 @@ export async function GET(
     { width: 30 },
     { width: 16 },
     { width: 16 },
-    { width: 14 },
     { width: 16 },
     { width: 16 },
     { width: 14 },
@@ -93,18 +92,12 @@ export async function GET(
   sheet.getCell("E6").value = resumen.totalPendiente;
   sheet.getCell("E6").numFmt = "#,##0";
 
-  sheet.getCell("D7").value = "Mora acumulada:";
-  sheet.getCell("D7").font = infoLabelStyle.font;
-  sheet.getCell("E7").value = resumen.totalMora;
-  sheet.getCell("E7").numFmt = "#,##0";
-
   const headerRowIndex = 10;
   const headers = [
     "Cuota",
     "Vencimiento",
     "Monto",
     "Pagado",
-    "Mora",
     "Fecha de pago",
     "Referencia",
     "N.º Recibo",
@@ -127,12 +120,10 @@ export async function GET(
     row.getCell(3).numFmt = "#,##0";
     row.getCell(4).value = c.monto_pagado;
     row.getCell(4).numFmt = "#,##0";
-    row.getCell(5).value = c.recargo;
-    row.getCell(5).numFmt = "#,##0";
-    row.getCell(6).value = formatDate(c.fecha_pago);
-    row.getCell(7).value = c.referencia ?? "-";
-    row.getCell(8).value = c.numero_recibo ?? "-";
-    row.getCell(9).value = c.estado;
+    row.getCell(5).value = formatDate(c.fecha_pago);
+    row.getCell(6).value = c.referencia ?? "-";
+    row.getCell(7).value = c.numero_recibo ?? "-";
+    row.getCell(8).value = c.estado;
   });
 
   const pendientesSheet = workbook.addWorksheet("Cuotas pendientes");
@@ -142,15 +133,14 @@ export async function GET(
     { width: 16 },
     { width: 16 },
     { width: 16 },
-    { width: 16 },
     { width: 14 },
   ];
 
-  pendientesSheet.mergeCells("A1:G1");
+  pendientesSheet.mergeCells("A1:F1");
   pendientesSheet.getCell("A1").value = `Cuotas pendientes de pago - Contrato N.º ${contrato.numero}`;
   pendientesSheet.getCell("A1").font = { bold: true, size: 14 };
 
-  const pHeaders = ["Cuota", "Vencimiento", "Monto", "Pagado", "Saldo", "Mora", "Estado"];
+  const pHeaders = ["Cuota", "Vencimiento", "Monto", "Pagado", "Saldo", "Estado"];
   const pHeaderRow = pendientesSheet.getRow(3);
   pHeaders.forEach((h, i) => {
     const cell = pHeaderRow.getCell(i + 1);
@@ -171,9 +161,7 @@ export async function GET(
       row.getCell(4).numFmt = "#,##0";
       row.getCell(5).value = c.saldo;
       row.getCell(5).numFmt = "#,##0";
-      row.getCell(6).value = c.recargo;
-      row.getCell(6).numFmt = "#,##0";
-      row.getCell(7).value = c.estado;
+      row.getCell(6).value = c.estado;
     });
 
     const totalRow = pendientesSheet.getRow(4 + cuotasPendientes.length + 1);

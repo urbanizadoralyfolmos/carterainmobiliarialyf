@@ -127,7 +127,7 @@ export default async function EstadoCuentaContratoPage({
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="rounded-md bg-slate-50 px-3 py-2">
             <p className="text-xs text-slate-500">Total contratado</p>
             <p className="text-sm font-semibold text-slate-900">
@@ -146,12 +146,6 @@ export default async function EstadoCuentaContratoPage({
               {formatMoney(resumen.totalPendiente, contrato.moneda)}
             </p>
           </div>
-          <div className="rounded-md bg-red-50 px-3 py-2">
-            <p className="text-xs text-slate-500">Mora acumulada</p>
-            <p className="text-sm font-semibold text-red-800">
-              {formatMoney(resumen.totalMora, contrato.moneda)}
-            </p>
-          </div>
         </div>
 
         <h2 className="mt-6 text-sm font-semibold text-slate-900">Cuotas pendientes de pago</h2>
@@ -165,7 +159,6 @@ export default async function EstadoCuentaContratoPage({
                   <th className="py-1 pr-3">Monto</th>
                   <th className="py-1 pr-3">Pagado</th>
                   <th className="py-1 pr-3">Saldo</th>
-                  <th className="py-1 pr-3">Mora</th>
                   <th className="py-1 pr-3">Estado</th>
                 </tr>
               </thead>
@@ -187,9 +180,6 @@ export default async function EstadoCuentaContratoPage({
                     <td className="py-1 pr-3 font-medium text-amber-800">
                       {formatMoney(c.saldo, contrato.moneda)}
                     </td>
-                    <td className="py-1 pr-3 text-slate-600">
-                      {c.recargo > 0 ? formatMoney(c.recargo, contrato.moneda) : "-"}
-                    </td>
                     <td className="py-1 pr-3 text-slate-600">{c.estado}</td>
                   </tr>
                 ))}
@@ -202,7 +192,7 @@ export default async function EstadoCuentaContratoPage({
                   <td className="py-1 pr-3 font-semibold text-amber-800">
                     {formatMoney(totalSaldoPendiente, contrato.moneda)}
                   </td>
-                  <td colSpan={2}></td>
+                  <td></td>
                 </tr>
               </tfoot>
             </table>
@@ -222,7 +212,6 @@ export default async function EstadoCuentaContratoPage({
                 <th className="py-1 pr-3">Vencimiento</th>
                 <th className="py-1 pr-3">Monto</th>
                 <th className="py-1 pr-3">Pagado</th>
-                <th className="py-1 pr-3">Mora</th>
                 <th className="py-1 pr-3">Fecha de pago</th>
                 <th className="py-1 pr-3">Referencia</th>
                 <th className="py-1 pr-3">N.º Recibo</th>
@@ -242,9 +231,6 @@ export default async function EstadoCuentaContratoPage({
                   <td className="py-1 pr-3 text-slate-600">
                     {formatMoney(c.monto_pagado, contrato.moneda)}
                   </td>
-                  <td className="py-1 pr-3 text-slate-600">
-                    {c.recargo > 0 ? formatMoney(c.recargo, contrato.moneda) : "-"}
-                  </td>
                   <td className="py-1 pr-3 text-slate-600">{formatDate(c.fecha_pago)}</td>
                   <td className="py-1 pr-3 text-slate-600">{c.referencia ?? "-"}</td>
                   <td className="py-1 pr-3 text-slate-600">{c.numero_recibo ?? "-"}</td>
@@ -253,7 +239,7 @@ export default async function EstadoCuentaContratoPage({
               ))}
               {detalle.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="py-4 text-center text-slate-400">
+                  <td colSpan={8} className="py-4 text-center text-slate-400">
                     Este contrato todavía no tiene cuotas generadas.
                   </td>
                 </tr>

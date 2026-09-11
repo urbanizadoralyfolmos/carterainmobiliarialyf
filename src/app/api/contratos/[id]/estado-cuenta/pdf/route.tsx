@@ -24,22 +24,20 @@ const styles = StyleSheet.create({
   },
   th: { color: "#ffffff", fontSize: 8, fontWeight: "bold", paddingHorizontal: 3 },
   td: { fontSize: 8, color: "#334155", paddingHorizontal: 3 },
-  colCuota: { width: "6%" },
-  colFecha: { width: "12%" },
-  colMonto: { width: "13%" },
-  colPagado: { width: "13%" },
-  colMora: { width: "10%" },
-  colFechaPago: { width: "12%" },
-  colRef: { width: "13%" },
-  colRecibo: { width: "10%" },
-  colEstado: { width: "11%" },
-  colCuotaP: { width: "10%" },
-  colFechaP: { width: "16%" },
-  colMontoP: { width: "16%" },
-  colPagadoP: { width: "16%" },
-  colSaldoP: { width: "16%" },
-  colMoraP: { width: "13%" },
-  colEstadoP: { width: "13%" },
+  colCuota: { width: "7%" },
+  colFecha: { width: "13%" },
+  colMonto: { width: "15%" },
+  colPagado: { width: "15%" },
+  colFechaPago: { width: "13%" },
+  colRef: { width: "14%" },
+  colRecibo: { width: "11%" },
+  colEstado: { width: "12%" },
+  colCuotaP: { width: "12%" },
+  colFechaP: { width: "18%" },
+  colMontoP: { width: "18%" },
+  colPagadoP: { width: "18%" },
+  colSaldoP: { width: "18%" },
+  colEstadoP: { width: "16%" },
   totalRow: {
     flexDirection: "row",
     borderTopWidth: 1,
@@ -117,10 +115,6 @@ export async function GET(
               {formatMoney(resumen.totalPendiente, contrato.moneda)}
             </Text>
           </View>
-          <View style={styles.card}>
-            <Text style={styles.cardLabel}>MORA ACUMULADA</Text>
-            <Text style={styles.cardValue}>{formatMoney(resumen.totalMora, contrato.moneda)}</Text>
-          </View>
         </View>
 
         <View style={styles.table}>
@@ -129,7 +123,6 @@ export async function GET(
             <Text style={[styles.th, styles.colFecha]}>Vencimiento</Text>
             <Text style={[styles.th, styles.colMonto]}>Monto</Text>
             <Text style={[styles.th, styles.colPagado]}>Pagado</Text>
-            <Text style={[styles.th, styles.colMora]}>Mora</Text>
             <Text style={[styles.th, styles.colFechaPago]}>Fecha pago</Text>
             <Text style={[styles.th, styles.colRef]}>Referencia</Text>
             <Text style={[styles.th, styles.colRecibo]}>N.º Recibo</Text>
@@ -146,9 +139,6 @@ export async function GET(
               </Text>
               <Text style={[styles.td, styles.colPagado]}>
                 {formatMoney(c.monto_pagado, contrato.moneda)}
-              </Text>
-              <Text style={[styles.td, styles.colMora]}>
-                {c.recargo > 0 ? formatMoney(c.recargo, contrato.moneda) : "-"}
               </Text>
               <Text style={[styles.td, styles.colFechaPago]}>{formatDate(c.fecha_pago)}</Text>
               <Text style={[styles.td, styles.colRef]}>{c.referencia ?? "-"}</Text>
@@ -175,7 +165,6 @@ export async function GET(
               <Text style={[styles.th, styles.colMontoP]}>Monto</Text>
               <Text style={[styles.th, styles.colPagadoP]}>Pagado</Text>
               <Text style={[styles.th, styles.colSaldoP]}>Saldo</Text>
-              <Text style={[styles.th, styles.colMoraP]}>Mora</Text>
               <Text style={[styles.th, styles.colEstadoP]}>Estado</Text>
             </View>
             {cuotasPendientes.map((c) => (
@@ -195,15 +184,12 @@ export async function GET(
                 <Text style={[styles.td, styles.colSaldoP]}>
                   {formatMoney(c.saldo, contrato.moneda)}
                 </Text>
-                <Text style={[styles.td, styles.colMoraP]}>
-                  {c.recargo > 0 ? formatMoney(c.recargo, contrato.moneda) : "-"}
-                </Text>
                 <Text style={[styles.td, styles.colEstadoP]}>{c.estado}</Text>
               </View>
             ))}
             <View style={styles.totalRow}>
               <Text
-                style={[styles.totalLabel, { width: "42%" }]}
+                style={[styles.totalLabel, { width: "66%" }]}
               >
                 Total pendiente
               </Text>

@@ -32,14 +32,12 @@ export default async function EstadoCuentaClientePage({
   let granTotalMonto = 0;
   let granTotalPagado = 0;
   let granTotalPendiente = 0;
-  let granTotalMora = 0;
 
   const contratosConResumen = (contratos ?? []).map((contrato) => {
-    const resumen = resumenCuotas(contrato.cuotas ?? [], contrato.tasa_mora_mensual);
+    const resumen = resumenCuotas(contrato.cuotas ?? []);
     granTotalMonto += resumen.totalMonto;
     granTotalPagado += resumen.totalPagado;
     granTotalPendiente += resumen.totalPendiente;
-    granTotalMora += resumen.totalMora;
     const propiedades = (contrato.contrato_propiedades ?? [])
       .map(
         (cp: {
@@ -82,7 +80,7 @@ export default async function EstadoCuentaClientePage({
           Generado el {formatDate(new Date().toISOString().slice(0, 10))}
         </p>
 
-        <div className="mt-4 grid grid-cols-4 gap-3">
+        <div className="mt-4 grid grid-cols-3 gap-3">
           <div className="rounded-md bg-slate-50 px-3 py-2">
             <p className="text-xs text-slate-500">Total contratado</p>
             <p className="text-sm font-semibold text-slate-900">
@@ -99,12 +97,6 @@ export default async function EstadoCuentaClientePage({
             <p className="text-xs text-slate-500">Saldo pendiente</p>
             <p className="text-sm font-semibold text-amber-800">
               {formatMoney(granTotalPendiente)}
-            </p>
-          </div>
-          <div className="rounded-md bg-red-50 px-3 py-2">
-            <p className="text-xs text-slate-500">Mora acumulada</p>
-            <p className="text-sm font-semibold text-red-800">
-              {formatMoney(granTotalMora)}
             </p>
           </div>
         </div>
@@ -131,7 +123,6 @@ export default async function EstadoCuentaClientePage({
                   <th className="py-1">Vencimiento</th>
                   <th className="py-1">Monto</th>
                   <th className="py-1">Pagado</th>
-                  <th className="py-1">Mora</th>
                   <th className="py-1">Estado</th>
                 </tr>
               </thead>
@@ -147,9 +138,6 @@ export default async function EstadoCuentaClientePage({
                       </td>
                       <td className="py-1 text-slate-600">
                         {formatMoney(c.monto_pagado, contrato.moneda)}
-                      </td>
-                      <td className="py-1 text-slate-600">
-                        {c.recargo > 0 ? formatMoney(c.recargo, contrato.moneda) : "-"}
                       </td>
                       <td className="py-1 text-slate-600">{c.estado}</td>
                     </tr>
