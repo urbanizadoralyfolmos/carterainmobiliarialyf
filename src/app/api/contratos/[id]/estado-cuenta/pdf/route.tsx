@@ -33,6 +33,21 @@ const styles = StyleSheet.create({
   colRef: { width: "13%" },
   colRecibo: { width: "10%" },
   colEstado: { width: "11%" },
+  colCuotaP: { width: "10%" },
+  colFechaP: { width: "16%" },
+  colMontoP: { width: "16%" },
+  colPagadoP: { width: "16%" },
+  colSaldoP: { width: "16%" },
+  colMoraP: { width: "13%" },
+  colEstadoP: { width: "13%" },
+  totalRow: {
+    flexDirection: "row",
+    borderTopWidth: 1,
+    borderTopColor: "#0f172a",
+    paddingVertical: 5,
+  },
+  totalLabel: { fontSize: 9, fontWeight: "bold", color: "#0f172a", paddingHorizontal: 3 },
+  totalValue: { fontSize: 9, fontWeight: "bold", color: "#92400e", paddingHorizontal: 3 },
 });
 
 export async function GET(
@@ -46,8 +61,9 @@ export async function GET(
     return NextResponse.json({ error: "Contrato no encontrado" }, { status: 404 });
   }
 
-  const { contrato, cliente, nombreCliente, propiedades, resumen } = data;
+  const { contrato, cliente, nombreCliente, propiedades, resumen, cuotasPendientes } = data;
   const detalle = [...resumen.detalle].sort((a, b) => a.numero_cuota - b.numero_cuota);
+  const totalSaldoPendiente = cuotasPendientes.reduce((acc, c) => acc + c.saldo, 0);
 
   const doc = (
     <Document>
@@ -141,6 +157,64 @@ export async function GET(
             </View>
           ))}
         </View>
+      </Page>
+
+      <Page size="A4" style={styles.page}>
+        <Text style={styles.title}>
+          Cuotas pendientes de pago - Contrato N.º {contrato.numero}
+        </Text>
+        <Text style={styles.subtitle}>
+          Generado el {formatDate(new Date().toISOString().slice(0, 10))}
+        </Text>
+
+        {cuotasPendientes.length > 0 ? (
+          <View style={styles.table}>
+            <View style={styles.tableHeaderRow}>
+              <Text style={[styles.th, styles.colCuotaP]}>Cuota</Text>
+              <Text style={[styles.th, styles.colFechaP]}>Vencimiento</Text>
+              <Text style={[styles.th, styles.colMontoP]}>Monto</Text>
+              <Text style={[styles.th, styles.colPagadoP]}>Pagado</Text>
+              <Text style={[styles.th, styles.colSaldoP]}>Saldo</Text>
+              <Text style={[styles.th, styles.colMoraP]}>Mora</Text>
+              <Text style={[styles.th, styles.colEstadoP]}>Estado</Text>
+            </View>
+            {cuotasPendientes.map((c) => (
+              <View style={styles.tableRow} key={c.id}>
+                <Text style={[styles.td, styles.colCuotaP]}>
+                  {c.numero_cuota === 0 ? "Inicial" : `#${c.numero_cuota}`}
+                </Text>
+                <Text style={[styles.td, styles.colFechaP]}>
+                  {formatDate(c.fecha_vencimiento)}
+                </Text>
+                <Text style={[styles.td, styles.colMontoP]}>
+                  {formatMoney(c.monto, contrato.moneda)}
+                </Text>
+                <Text style={[styles.td, styles.colPagadoP]}>
+                  {formatMoney(c.monto_pagado, contrato.moneda)}
+                </Text>
+                <Text style={[styles.td, styles.colSaldoP]}>
+                  {formatMoney(c.saldo, contrato.moneda)}
+                </Text>
+                <Text style={[styles.td, styles.colMoraP]}>
+                  {c.recargo > 0 ? formatMoney(c.recargo, contrato.moneda) : "-"}
+                </Text>
+                <Text style={[styles.td, styles.colEstadoP]}>{c.estado}</Text>
+              </View>
+            ))}
+            <View style={styles.totalRow}>
+              <Text
+                style={[styles.totalLabel, { width: "42%" }]}
+              >
+                Total pendiente
+              </Text>
+              <Text style={[styles.totalValue, styles.colSaldoP]}>
+                {formatMoney(totalSaldoPendiente, contrato.moneda)}
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <Text style={styles.cardText}>Este contrato no tiene cuotas pendientes de pago.</Text>
+        )}
       </Page>
     </Document>
   );
