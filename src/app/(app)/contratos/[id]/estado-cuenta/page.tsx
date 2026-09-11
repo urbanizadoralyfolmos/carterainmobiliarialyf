@@ -31,13 +31,13 @@ export default async function EstadoCuentaContratoPage({
           ← Volver al contrato
         </Link>
         <div className="flex gap-2">
-          <a
+          
             href={`/api/contratos/${id}/estado-cuenta/excel`}
             className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
           >
             Descargar Excel
           </a>
-          <a
+          
             href={`/api/contratos/${id}/estado-cuenta/pdf`}
             className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
           >
@@ -163,6 +163,7 @@ export default async function EstadoCuentaContratoPage({
                 <th className="py-1 pr-3">Mora</th>
                 <th className="py-1 pr-3">Fecha de pago</th>
                 <th className="py-1 pr-3">Referencia</th>
+                <th className="py-1 pr-3">N.º Recibo</th>
                 <th className="py-1 pr-3">Estado</th>
               </tr>
             </thead>
@@ -184,12 +185,13 @@ export default async function EstadoCuentaContratoPage({
                   </td>
                   <td className="py-1 pr-3 text-slate-600">{formatDate(c.fecha_pago)}</td>
                   <td className="py-1 pr-3 text-slate-600">{c.referencia ?? "-"}</td>
+                  <td className="py-1 pr-3 text-slate-600">{c.numero_recibo ?? "-"}</td>
                   <td className="py-1 pr-3 text-slate-600">{c.estado}</td>
                 </tr>
               ))}
               {detalle.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="py-4 text-center text-slate-400">
+                  <td colSpan={9} className="py-4 text-center text-slate-400">
                     Este contrato todavía no tiene cuotas generadas.
                   </td>
                 </tr>
