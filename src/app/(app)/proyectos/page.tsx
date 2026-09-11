@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { formatMoney } from "@/lib/utils/format";
 
 export default async function ProyectosPage() {
   const supabase = await createClient();
@@ -35,29 +36,60 @@ export default async function ProyectosPage() {
         </p>
       )}
 
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {proyectos?.map((p) => {
-          const conteo = conteoPorProyecto.get(p.id) ?? { total: 0, disponibles: 0 };
-          return (
-            <Link
-              key={p.id}
-              href={`/proyectos/${p.id}`}
-              className="rounded-lg border border-slate-200 bg-white p-4 hover:border-slate-300 hover:shadow-sm"
-            >
-              <h2 className="font-medium text-slate-900">{p.nombre}</h2>
-              <p className="mt-1 text-sm text-slate-500">{p.ciudad ?? "sin ciudad"}</p>
-              <p className="mt-2 text-sm text-slate-600">
-                {conteo.total} lote{conteo.total === 1 ? "" : "s"} · {conteo.disponibles} disponible
-                {conteo.disponibles === 1 ? "" : "s"}
-              </p>
-            </Link>
-          );
-        })}
-        {proyectos?.length === 0 && (
-          <p className="col-span-full py-6 text-center text-slate-400">
-            Todavía no hay proyectos cargados.
-          </p>
-        )}
+      <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <table className="min-w-full divide-y divide-slate-200 text-sm">
+          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+            <tr>
+              <th className="px-4 py-2">Nombre</th>
+              <th className="px-4 py-2">Ciudad</th>
+              <th className="px-4 py-2">Valor m²</th>
+              <th className="px-4 py-2">Lotes</th>
+              <th className="px-4 py-2">Disponibles</th>
+              <th className="px-4 py-2 text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {proyectos?.map((p) => {
+              const conteo = conteoPorProyecto.get(p.id) ?? { total: 0, disponibles: 0 };
+              return (
+                <tr key={p.id} className="hover:bg-slate-50">
+                  <td className="px-4 py-2 font-medium text-slate-900">
+                    <Link href={`/proyectos/${p.id}`} className="hover:underline">
+                      {p.nombre}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-2 text-slate-600">{p.ciudad ?? "-"}</td>
+                  <td className="px-4 py-2 text-slate-600">
+                    {p.valor_m2 ? formatMoney(p.valor_m2) : "-"}
+                  </td>
+                  <td className="px-4 py-2 text-slate-600">{conteo.total}</td>
+                  <td className="px-4 py-2 text-slate-600">{conteo.disponibles}</td>
+                  <td className="px-4 py-2 text-right">
+                    <Link
+                      href={`/proyectos/${p.id}/estado-cuenta`}
+                      className="text-slate-600 hover:text-slate-900 hover:underline"
+                    >
+                      Estado de cuenta
+                    </Link>
+                    <Link
+                      href={`/proyectos/${p.id}`}
+                      className="ml-3 text-slate-600 hover:text-slate-900 hover:underline"
+                    >
+                      Editar
+                    </Link>
+                  </td>
+                </tr>
+              );
+            })}
+            {proyectos?.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-4 py-6 text-center text-slate-400">
+                  Todavía no hay proyectos cargados.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );
