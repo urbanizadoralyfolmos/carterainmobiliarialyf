@@ -26,8 +26,9 @@ export default async function EstadoCuentaContratoPage({
 
   if (!data) notFound();
 
-  const { contrato, cliente, nombreCliente, propiedades, resumen } = data;
+  const { contrato, cliente, nombreCliente, propiedades, resumen, cuotasPendientes } = data;
   const detalle = [...resumen.detalle].sort((a, b) => a.numero_cuota - b.numero_cuota);
+  const totalSaldoPendiente = cuotasPendientes.reduce((acc, c) => acc + c.saldo, 0);
 
   return (
     <div>
@@ -152,6 +153,65 @@ export default async function EstadoCuentaContratoPage({
             </p>
           </div>
         </div>
+
+        <h2 className="mt-6 text-sm font-semibold text-slate-900">Cuotas pendientes de pago</h2>
+        {cuotasPendientes.length > 0 ? (
+          <div className="mt-2 overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="text-left text-xs uppercase text-slate-500">
+                <tr>
+                  <th className="py-1 pr-3">Cuota</th>
+                  <th className="py-1 pr-3">Vencimiento</th>
+                  <th className="py-1 pr-3">Monto</th>
+                  <th className="py-1 pr-3">Pagado</th>
+                  <th className="py-1 pr-3">Saldo</th>
+                  <th className="py-1 pr-3">Mora</th>
+                  <th className="py-1 pr-3">Estado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {cuotasPendientes.map((c) => (
+                  <tr key={c.id}>
+                    <td className="py-1 pr-3">
+                      {c.numero_cuota === 0 ? "Inicial" : `#${c.numero_cuota}`}
+                    </td>
+                    <td className="py-1 pr-3 text-slate-600">
+                      {formatDate(c.fecha_vencimiento)}
+                    </td>
+                    <td className="py-1 pr-3 text-slate-600">
+                      {formatMoney(c.monto, contrato.moneda)}
+                    </td>
+                    <td className="py-1 pr-3 text-slate-600">
+                      {formatMoney(c.monto_pagado, contrato.moneda)}
+                    </td>
+                    <td className="py-1 pr-3 font-medium text-amber-800">
+                      {formatMoney(c.saldo, contrato.moneda)}
+                    </td>
+                    <td className="py-1 pr-3 text-slate-600">
+                      {c.recargo > 0 ? formatMoney(c.recargo, contrato.moneda) : "-"}
+                    </td>
+                    <td className="py-1 pr-3 text-slate-600">{c.estado}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-slate-200">
+                  <td className="py-1 pr-3 font-semibold text-slate-900" colSpan={4}>
+                    Total pendiente
+                  </td>
+                  <td className="py-1 pr-3 font-semibold text-amber-800">
+                    {formatMoney(totalSaldoPendiente, contrato.moneda)}
+                  </td>
+                  <td colSpan={2}></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        ) : (
+          <p className="mt-2 text-sm text-slate-400">
+            Este contrato no tiene cuotas pendientes de pago.
+          </p>
+        )}
 
         <h2 className="mt-6 text-sm font-semibold text-slate-900">Detalle de cuotas</h2>
         <div className="mt-2 overflow-x-auto">
