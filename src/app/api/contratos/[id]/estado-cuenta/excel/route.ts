@@ -33,6 +33,7 @@ export async function GET(
     { width: 16 },
     { width: 16 },
     { width: 14 },
+    { width: 14 },
   ];
 
   sheet.mergeCells("A1:H1");
@@ -105,6 +106,7 @@ export async function GET(
     "Mora",
     "Fecha de pago",
     "Referencia",
+    "N.º Recibo",
     "Estado",
   ];
   const headerRow = sheet.getRow(headerRowIndex);
@@ -128,7 +130,8 @@ export async function GET(
     row.getCell(5).numFmt = "#,##0";
     row.getCell(6).value = formatDate(c.fecha_pago);
     row.getCell(7).value = c.referencia ?? "-";
-    row.getCell(8).value = c.estado;
+    row.getCell(8).value = c.numero_recibo ?? "-";
+    row.getCell(9).value = c.estado;
   });
 
   const buffer = await workbook.xlsx.writeBuffer();
