@@ -30,14 +30,19 @@ export default async function ClientesPage({
 
   return (
     <div>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-semibold text-slate-900">Clientes</h1>
-        <Link
-          href="/clientes/nuevo"
-          className="rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-dark"
-        >
-          + Nuevo cliente
-        </Link>
+        <div className="flex items-center gap-2">
+          <a href="/api/clientes/por-proyecto/excel" className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100">
+            Exportar por proyecto (Excel)
+          </a>
+          <Link
+            href="/clientes/nuevo"
+            className="rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-dark"
+          >
+            + Nuevo cliente
+          </Link>
+        </div>
       </div>
 
       <div className="mt-3">
