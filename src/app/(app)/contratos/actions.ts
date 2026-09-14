@@ -180,3 +180,178 @@ export async function eliminarContrato(id: string) {
   revalidatePath("/cuotas");
   redirect("/contratos");
 }
+
+/**
+ * Lee los datos de un cliente nuevo desde el formulario de revisión de la
+ * promesa de compraventa (campos prefijados con "nuevo_cliente_" para no
+ * chocar con los campos del propio contrato, p. ej. "notas").
+ */
+function readClienteDesdePromesa(formData: FormData) {
+  const tipoPersona =
+    String(formData.get("nuevo_cliente_tipo_persona") ?? "natural") === "juridica"
+      ? "juridica"
+      : "natural";
+
+  return {
+    nombre: String(formData.get("nuevo_cliente_nombre") ?? "").trim(),
+    apellido: String(formData.get("nuevo_cliente_apellido") ?? "").trim(),
+    documento: String(formData.get("nuevo_cliente_documento") ?? "").trim() || null,
+    email: String(formData.get("nuevo_cliente_email") ?? "").trim() || null,
+    telefono: normalizarTelefonoCO(String(formData.get("nuevo_cliente_telefono") ?? "")),
+    direccion: String(formData.get("nuevo_cliente_direccion") ?? "").trim() || null,
+    notas: null as string | null,
+    tipo_persona: tipoPersona,
+    razon_social:
+      tipoPersona === "juridica"
+        ? String(formData.get("nuevo_cliente_razon_social") ?? "").trim() || null
+        : null,
+    nit:
+      tipoPersona === "juridica"
+        ? String(formData.get("nuevo_cliente_nit") ?? "").trim() || null
+        : null,
+    representante_nombre:
+      tipoPersona === "juridica"
+        ? String(formData.get("nuevo_cliente_nombre") ?? "").trim() || null
+        : null,
+    representante_documento:
+      tipoPersona === "juridica"
+        ? String(formData.get("nuevo_cliente_representante_documento") ?? "").trim() || null
+        : null,
+  };
+}
+
+/**
+ * Crea un contrato a partir de los datos revisados/confirmados que salieron
+ * de leer una promesa de compraventa en PDF (ver /contratos/nueva-promesa).
+ * Si el cliente no existía, lo crea primero; luego reutiliza la misma
+ * mecánica de creación de contrato + vínculo de propiedades + generación de
+ * cuotas que usa "Nuevo contrato" manual.
+ */
+export async function crearContratoDesdePromesa(formData: FormData) {
+  const supabase = await createClient();
+  const modo = String(formData.get("cliente_modo") ?? "existente");
+
+  let clienteId = String(formData.get("cliente_id") ?? "");
+
+  if (modo === "nuevo") {
+    const clienteData = readClienteDesdePromesa(formData);
+
+    if (!clienteData.nombre || !clienteData.apellido) {
+      redirect(
+        `/contratos/nueva-promesa?error=${encodeURIComponent(
+          "Completa al menos el nombre y apellido del nuevo cliente."
+        )}`
+      );
+    }
+
+    const { data: clienteCreado, error: errorCliente } = await supabase
+      .from("clientes")
+      .insert(clienteData)
+      .select()
+      .single();
+
+    if (errorCliente || !clienteCreado) {
+      redirect(
+        `/contratos/nueva-promesa?error=${encodeURIComponent(
+          errorCliente?.message ?? "No se pudo crear el cliente."
+        )}`
+      );
+    }
+
+    clienteId = clienteCreado!.id;
+  }
+
+  if (!clienteId) {
+    redirect(
+      `/contratos/nueva-promesa?error=${encodeURIComponent(
+        "Selecciona un cliente existente o completa los datos del nuevo cliente."
+      )}`
+    );
+  }
+
+  const data = readContratoForm(formData);
+  data.cliente_id = clienteId;
+  const propiedadIds = readPropiedadIds(formData);
+
+  if (propiedadIds.length === 0) {
+    redirect(
+      `/contratos/nueva-promesa?error=${encodeURIComponent(
+        "Selecciona al menos una propiedad/lote."
+      )}`
+    );
+  }
+
+  const { data: contrato, error } = await supabase
+    .from("contratos")
+    .insert(data)
+    .select()
+    .single();
+
+  if (error || !contrato) {
+    redirect(`/contratos/nueva-promesa?error=${encodeURIComponent(error?.message ?? "Error")}`);
+  }
+
+  const { error: errorVinculos } = await supabase.from("contrato_propiedades").insert(
+    propiedadIds.map((propiedad_id) => ({ contrato_id: contrato!.id, propiedad_id }))
+  );
+  if (errorVinculos) {
+    redirect(`/contratos/nueva-promesa?error=${encodeURIComponent(errorVinculos.message)}`);
+  }
+
+  const cuotas: {
+    contrato_id: string;
+    numero_cuota: number;
+    fecha_vencimiento: string;
+    monto: number;
+    monto_pagado: number;
+    estado: string;
+  }[] = [];
+
+  if (data.cuota_inicial > 0) {
+    cuotas.push({
+      contrato_id: contrato!.id,
+      numero_cuota: 0,
+      fecha_vencimiento: data.fecha_inicio,
+      monto: data.cuota_inicial,
+      monto_pagado: 0,
+      estado: "pendiente",
+    });
+  }
+
+  const offsetMeses = data.cuota_inicial > 0 ? 1 : 0;
+  const fechas = generarFechasCuotas(
+    data.fecha_inicio,
+    data.cantidad_cuotas,
+    data.dia_vencimiento,
+    offsetMeses
+  );
+
+  fechas.forEach((fecha, i) => {
+    const monto = Number(formData.get(`monto_cuota_${i + 1}`) ?? 0);
+    cuotas.push({
+      contrato_id: contrato!.id,
+      numero_cuota: i + 1,
+      fecha_vencimiento: fecha,
+      monto,
+      monto_pagado: 0,
+      estado: "pendiente",
+    });
+  });
+
+  const { error: errorCuotas } = await supabase.from("cuotas").insert(cuotas);
+  if (errorCuotas) {
+    redirect(`/contratos/nueva-promesa?error=${encodeURIComponent(errorCuotas.message)}`);
+  }
+
+  await supabase
+    .from("propiedades")
+    .update({ estado: "prometido_en_venta" })
+    .in("id", propiedadIds)
+    .eq("estado", "disponible");
+
+  revalidatePath("/contratos");
+  revalidatePath("/cuotas");
+  revalidatePath("/propiedades");
+  revalidatePath("/clientes");
+  redirect("/contratos");
+}
