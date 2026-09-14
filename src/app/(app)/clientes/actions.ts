@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { normalizarTelefonoCO } from "@/lib/utils/telefono";
 
 function readClienteForm(formData: FormData) {
   const tipoPersona = String(formData.get("tipo_persona") ?? "natural") === "juridica"
@@ -14,7 +15,7 @@ function readClienteForm(formData: FormData) {
     apellido: String(formData.get("apellido") ?? "").trim(),
     documento: String(formData.get("documento") ?? "").trim() || null,
     email: String(formData.get("email") ?? "").trim() || null,
-    telefono: String(formData.get("telefono") ?? "").trim() || null,
+    telefono: normalizarTelefonoCO(String(formData.get("telefono") ?? "")),
     direccion: String(formData.get("direccion") ?? "").trim() || null,
     notas: String(formData.get("notas") ?? "").trim() || null,
     tipo_persona: tipoPersona,
