@@ -46,7 +46,12 @@ export default async function ReciboPage({
         <Link href="/cuotas" className="text-sm text-slate-500 hover:underline">
           ← Volver a cuotas
         </Link>
-        <PrintButton />
+        <div className="flex items-center gap-2">
+          <a href={`/api/recibos/${id}/pdf`} className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100">
+            Descargar PDF
+          </a>
+          <PrintButton />
+        </div>
       </div>
 
       <div className="mx-auto mt-6 max-w-xl rounded-lg border border-slate-200 bg-white p-8 print:border-0 print:p-0 print:shadow-none">
