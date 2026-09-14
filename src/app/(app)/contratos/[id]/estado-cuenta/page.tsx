@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { formatMoney, formatDate } from "@/lib/utils/format";
 import { PrintButton } from "@/components/PrintButton";
 import { getEstadoCuentaContrato } from "@/lib/estado-cuenta-contrato";
+import { agregarCuota, eliminarCuota } from "@/app/(app)/cuotas/actions";
 
 const ESTADO_LABELS: Record<string, string> = {
   activo: "Activo",
@@ -18,10 +19,13 @@ const DOWNLOAD_LINKS = [
 
 export default async function EstadoCuentaContratoPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ error?: string }>;
 }) {
   const { id } = await params;
+  const { error } = await searchParams;
   const data = await getEstadoCuentaContrato(id);
 
   if (!data) notFound();
@@ -38,7 +42,7 @@ export default async function EstadoCuentaContratoPage({
         </Link>
         <div className="flex gap-2">
           {DOWNLOAD_LINKS.map((link) => (
-            <a
+            
               key={link.tipo}
               href={`/api/contratos/${id}/estado-cuenta/${link.tipo}`}
               className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
@@ -49,6 +53,12 @@ export default async function EstadoCuentaContratoPage({
           <PrintButton />
         </div>
       </div>
+
+      {error && (
+        <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 print:hidden">
+          {error}
+        </p>
+      )}
 
       <div className="mt-4 rounded-lg border border-slate-200 bg-white p-6 print:border-0 print:p-0">
         <h1 className="text-lg font-semibold text-slate-900">
@@ -216,6 +226,7 @@ export default async function EstadoCuentaContratoPage({
                 <th className="py-1 pr-3">Referencia</th>
                 <th className="py-1 pr-3">N.º Recibo</th>
                 <th className="py-1 pr-3">Estado</th>
+                <th className="py-1 pr-3 text-right print:hidden">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -235,17 +246,79 @@ export default async function EstadoCuentaContratoPage({
                   <td className="py-1 pr-3 text-slate-600">{c.referencia ?? "-"}</td>
                   <td className="py-1 pr-3 text-slate-600">{c.numero_recibo ?? "-"}</td>
                   <td className="py-1 pr-3 text-slate-600">{c.estado}</td>
+                  <td className="py-1 pr-3 text-right print:hidden">
+                    <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                      <Link
+                        href={`/cuotas/${c.id}/editar`}
+                        className="text-xs text-slate-500 hover:text-slate-800 hover:underline"
+                      >
+                        Editar
+                      </Link>
+                      <form action={eliminarCuota.bind(null, c.id, contrato.id)}>
+                        <button
+                          type="submit"
+                          className="text-xs text-red-600 hover:text-red-800 hover:underline"
+                        >
+                          Eliminar
+                        </button>
+                      </form>
+                    </div>
+                  </td>
                 </tr>
               ))}
               {detalle.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="py-4 text-center text-slate-400">
+                  <td colSpan={9} className="py-4 text-center text-slate-400">
                     Este contrato todavía no tiene cuotas generadas.
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="mt-4 rounded-md border border-dashed border-slate-300 p-3 print:hidden">
+          <h3 className="text-xs font-semibold uppercase text-slate-500">
+            Agregar cuota faltante
+          </h3>
+          <p className="mt-1 text-xs text-slate-400">
+            Se agrega al final del plan (con el siguiente número de cuota disponible).
+          </p>
+          <form
+            action={agregarCuota.bind(null, contrato.id)}
+            className="mt-2 flex flex-wrap items-end gap-2"
+          >
+            <div>
+              <label className="block text-xs font-medium text-slate-700">
+                Fecha de vencimiento
+              </label>
+              <input
+                type="date"
+                name="fecha_vencimiento"
+                required
+                className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-700">
+                Monto ({contrato.moneda})
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                name="monto"
+                required
+                className="mt-1 w-36 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              />
+            </div>
+            <button
+              type="submit"
+              className="rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-dark"
+            >
+              Agregar cuota
+            </button>
+          </form>
         </div>
       </div>
     </div>
