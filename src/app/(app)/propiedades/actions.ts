@@ -71,19 +71,22 @@ export async function eliminarPropiedad(id: string) {
 }
 
 /**
- * Actualiza solo la superficie (m²) de una propiedad desde la lista, sin
- * necesidad de entrar a la página de edición completa del lote. No toca
- * ningún otro campo.
+ * Actualiza solo la superficie (m²) de una propiedad desde una lista (la de
+ * Propiedades o la de Lotes dentro de un Proyecto), sin necesidad de entrar
+ * a la página de edición completa del lote. No toca ningún otro campo.
+ * `redirect_to` permite volver a la página/filtro desde donde se llamó si
+ * algo sale mal (por defecto, la lista de Propiedades).
  */
 export async function actualizarSuperficiePropiedad(id: string, formData: FormData) {
   const supabase = await createClient();
   const raw = formData.get("superficie_m2");
   const texto = String(raw ?? "").trim();
   const superficie_m2 = texto === "" ? null : Number(texto);
+  const redirectTo = String(formData.get("redirect_to") ?? "").trim() || "/propiedades";
 
   if (superficie_m2 !== null && (Number.isNaN(superficie_m2) || superficie_m2 < 0)) {
     redirect(
-      `/propiedades?error=${encodeURIComponent("La superficie debe ser un número válido.")}`
+      `${redirectTo}?error=${encodeURIComponent("La superficie debe ser un número válido.")}`
     );
   }
 
@@ -93,8 +96,9 @@ export async function actualizarSuperficiePropiedad(id: string, formData: FormDa
     .eq("id", id);
 
   if (error) {
-    redirect(`/propiedades?error=${encodeURIComponent(error.message)}`);
+    redirect(`${redirectTo}?error=${encodeURIComponent(error.message)}`);
   }
 
   revalidatePath("/propiedades");
+  revalidatePath("/proyectos", "layout");
 }
