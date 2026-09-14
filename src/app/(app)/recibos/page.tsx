@@ -143,6 +143,9 @@ export default async function RecibosPage({
                     >
                       Ver / imprimir
                     </Link>
+                    <a href={`/api/recibos/${r.id}/pdf`} className="ml-3 text-slate-600 hover:text-slate-900 hover:underline">
+                      PDF
+                    </a>
                   </td>
                 </tr>
               );
