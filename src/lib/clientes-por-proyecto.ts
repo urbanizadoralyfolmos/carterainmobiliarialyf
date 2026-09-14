@@ -1,10 +1,17 @@
 import { createClient } from "@/lib/supabase/server";
 
-type ProyectoRel = { nombre: string } | { nombre: string }[] | null | undefined;
+/** Clave interna usada para agrupar los contratos sin proyecto asignado. */
+export const SIN_PROYECTO_ID = "sin-proyecto";
 
-function nombreProyecto(rel: ProyectoRel) {
-  if (Array.isArray(rel)) return rel[0]?.nombre ?? "";
-  return rel?.nombre ?? "";
+type ProyectoRel =
+  | { id: string; nombre: string }
+  | { id: string; nombre: string }[]
+  | null
+  | undefined;
+
+function proyectoDe(rel: ProyectoRel): { id: string | null; nombre: string } {
+  const p = Array.isArray(rel) ? rel[0] : rel;
+  return { id: p?.id ?? null, nombre: p?.nombre ?? "" };
 }
 
 type ClienteRel = {
@@ -42,9 +49,13 @@ export type ClienteProyectoFila = {
 };
 
 export type ClientesPorProyecto = {
+  /** null cuando es el grupo "Sin proyecto". */
+  proyectoId: string | null;
   proyecto: string;
   clientes: ClienteProyectoFila[];
 };
+
+export type ProyectoOpcion = { id: string; nombre: string };
 
 function nombreClienteDe(c: NonNullable<ClienteRel>) {
   if (c.tipo_persona === "juridica" && c.razon_social) return c.razon_social;
@@ -55,21 +66,34 @@ function documentoDe(c: NonNullable<ClienteRel>) {
   return (c.tipo_persona === "juridica" ? c.nit : c.documento) ?? "-";
 }
 
+/** Proyectos disponibles para el selector de filtro antes de exportar. */
+export async function getProyectosDisponibles(): Promise<ProyectoOpcion[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("proyectos").select("id, nombre").order("nombre");
+  return data ?? [];
+}
+
 /**
  * Arma el listado de clientes con sus datos de contacto, agrupados por el
  * proyecto de las propiedades que tienen contratadas. Un mismo cliente puede
  * aparecer en más de un proyecto si tiene contratos en varios; dentro de un
  * mismo proyecto se agrupan todos sus contratos/propiedades en una sola fila
  * para no repetir sus datos de contacto varias veces. Las propiedades sin
- * proyecto asignado quedan en el grupo "Sin proyecto".
+ * proyecto asignado quedan en el grupo "Sin proyecto" (id `SIN_PROYECTO_ID`).
+ *
+ * `proyectoIdsSeleccionados`, si se indica, limita el resultado solo a esos
+ * proyectos (usar `SIN_PROYECTO_ID` para incluir el grupo "Sin proyecto").
+ * Si se omite, se devuelven todos los proyectos.
  */
-export async function getClientesPorProyecto(): Promise<ClientesPorProyecto[]> {
+export async function getClientesPorProyecto(
+  proyectoIdsSeleccionados?: string[]
+): Promise<ClientesPorProyecto[]> {
   const supabase = await createClient();
 
   const { data } = await supabase
     .from("contratos")
     .select(
-      "id, numero, clientes(id, nombre, apellido, documento, email, telefono, direccion, tipo_persona, razon_social, nit), contrato_propiedades(propiedades(direccion, proyectos(nombre)))"
+      "id, numero, clientes(id, nombre, apellido, documento, email, telefono, direccion, tipo_persona, razon_social, nit), contrato_propiedades(propiedades(direccion, proyectos(id, nombre)))"
     )
     .order("numero", { ascending: true });
 
@@ -79,7 +103,9 @@ export async function getClientesPorProyecto(): Promise<ClientesPorProyecto[]> {
     propiedades: Set<string>;
   };
 
+  // clave de proyecto (id real o SIN_PROYECTO_ID) -> clienteId -> acumulado
   const porProyecto = new Map<string, Map<string, Acumulado>>();
+  const nombresPorClave = new Map<string, string>();
 
   for (const row of (data ?? []) as unknown as ContratoRow[]) {
     const cliente = row.clientes;
@@ -87,18 +113,20 @@ export async function getClientesPorProyecto(): Promise<ClientesPorProyecto[]> {
 
     // Las propiedades de un mismo contrato pueden pertenecer a distintos
     // proyectos (caso poco común, pero posible); se agrupan por proyecto.
-    const direccionesPorProyecto = new Map<string, string[]>();
+    const porClaveDelContrato = new Map<string, string[]>();
     for (const cp of row.contrato_propiedades ?? []) {
       const prop = cp.propiedades;
       if (!prop) continue;
-      const nombreProy = nombreProyecto(prop.proyectos) || "Sin proyecto";
-      if (!direccionesPorProyecto.has(nombreProy)) direccionesPorProyecto.set(nombreProy, []);
-      direccionesPorProyecto.get(nombreProy)?.push(prop.direccion);
+      const { id: proyectoId, nombre } = proyectoDe(prop.proyectos);
+      const clave = proyectoId ?? SIN_PROYECTO_ID;
+      nombresPorClave.set(clave, proyectoId ? nombre : "Sin proyecto");
+      if (!porClaveDelContrato.has(clave)) porClaveDelContrato.set(clave, []);
+      porClaveDelContrato.get(clave)?.push(prop.direccion);
     }
 
-    for (const [proyecto, direcciones] of direccionesPorProyecto) {
-      if (!porProyecto.has(proyecto)) porProyecto.set(proyecto, new Map());
-      const clientesDelProyecto = porProyecto.get(proyecto)!;
+    for (const [clave, direcciones] of porClaveDelContrato) {
+      if (!porProyecto.has(clave)) porProyecto.set(clave, new Map());
+      const clientesDelProyecto = porProyecto.get(clave)!;
       if (!clientesDelProyecto.has(cliente.id)) {
         clientesDelProyecto.set(cliente.id, {
           cliente,
@@ -112,14 +140,21 @@ export async function getClientesPorProyecto(): Promise<ClientesPorProyecto[]> {
     }
   }
 
-  const proyectos = Array.from(porProyecto.keys()).sort((a, b) => {
-    if (a === "Sin proyecto") return 1;
-    if (b === "Sin proyecto") return -1;
-    return a.localeCompare(b);
+  let claves = Array.from(porProyecto.keys());
+
+  if (proyectoIdsSeleccionados) {
+    const permitidas = new Set(proyectoIdsSeleccionados);
+    claves = claves.filter((clave) => permitidas.has(clave));
+  }
+
+  claves.sort((a, b) => {
+    if (a === SIN_PROYECTO_ID) return 1;
+    if (b === SIN_PROYECTO_ID) return -1;
+    return (nombresPorClave.get(a) ?? "").localeCompare(nombresPorClave.get(b) ?? "");
   });
 
-  return proyectos.map((proyecto) => {
-    const clientesMap = porProyecto.get(proyecto)!;
+  return claves.map((clave) => {
+    const clientesMap = porProyecto.get(clave)!;
     const clientes: ClienteProyectoFila[] = Array.from(clientesMap.values())
       .map(({ cliente, contratos, propiedades }) => ({
         clienteId: cliente.id,
@@ -133,6 +168,10 @@ export async function getClientesPorProyecto(): Promise<ClientesPorProyecto[]> {
         propiedadesTexto: Array.from(propiedades).join(", "),
       }))
       .sort((a, b) => a.nombreCliente.localeCompare(b.nombreCliente));
-    return { proyecto, clientes };
+    return {
+      proyectoId: clave === SIN_PROYECTO_ID ? null : clave,
+      proyecto: nombresPorClave.get(clave) ?? "Sin proyecto",
+      clientes,
+    };
   });
 }
