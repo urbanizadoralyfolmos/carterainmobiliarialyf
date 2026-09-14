@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatMoney } from "@/lib/utils/format";
 import { ProyectoForm } from "@/components/ProyectoForm";
 import { actualizarProyecto, eliminarProyecto, generarLotes } from "../actions";
+import { actualizarSuperficiePropiedad } from "@/app/(app)/propiedades/actions";
 
 const ESTADO_LABELS: Record<string, string> = {
   disponible: "Disponible",
@@ -60,6 +61,10 @@ export default async function ProyectoDetallePage({
   const lotesFiltrados = manzanaFiltro
     ? (lotes ?? []).filter((l) => l.manzana === manzanaFiltro)
     : lotes ?? [];
+
+  const redirectToLotes = `/proyectos/${id}${
+    manzanaFiltro ? `?manzana=${encodeURIComponent(manzanaFiltro)}` : ""
+  }`;
 
   return (
     <div>
@@ -265,7 +270,23 @@ export default async function ProyectoDetallePage({
                   <td className="px-4 py-2 font-medium text-slate-900">{l.direccion}</td>
                   <td className="px-4 py-2 text-slate-600">{l.manzana ?? "-"}</td>
                   <td className="px-4 py-2 text-slate-600">
-                    {l.superficie_m2 ? `${l.superficie_m2} m²` : "-"}
+                    <form
+                      action={actualizarSuperficiePropiedad.bind(null, l.id)}
+                      className="flex items-center gap-1"
+                    >
+                      <input type="hidden" name="redirect_to" value={redirectToLotes} />
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        name="superficie_m2"
+                        defaultValue={l.superficie_m2 ?? ""}
+                        className="w-20 rounded-md border border-slate-300 px-1.5 py-1 text-sm"
+                      />
+                      <button type="submit" className="text-xs text-brand hover:underline">
+                        Guardar
+                      </button>
+                    </form>
                   </td>
                   <td className="px-4 py-2 text-slate-600">
                     {l.valor_referencia ? formatMoney(l.valor_referencia) : "-"}
