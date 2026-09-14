@@ -44,11 +44,7 @@ export default async function EstadoCuentaContratoPage({
           {DOWNLOAD_LINKS.map((link) => {
             const href = `/api/contratos/${id}/estado-cuenta/${link.tipo}`;
             return (
-              
-                key={link.tipo}
-                href={href}
-                className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
-              >
+              <a key={link.tipo} href={href} className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100">
                 {link.etiqueta}
               </a>
             );
@@ -98,3 +94,232 @@ export default async function EstadoCuentaContratoPage({
 
           <div className="rounded-md bg-slate-50 p-4">
             <h2 className="text-xs font-semibold uppercase text-slate-500">
+              Propiedad{propiedades.length > 1 ? "es" : ""}
+            </h2>
+            {propiedades.length > 0 ? (
+              propiedades.map((p, i) => (
+                <p key={i} className="mt-1 text-sm text-slate-700">
+                  {p.proyecto ? `${p.proyecto} · ` : ""}
+                  {p.direccion}
+                  {p.manzana ? ` · Mz. ${p.manzana}` : ""}
+                  {p.numero_lote ? ` · Lote ${p.numero_lote}` : ""}
+                </p>
+              ))
+            ) : (
+              <p className="mt-1 text-sm text-slate-400">Sin propiedad asociada</p>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="rounded-md bg-slate-50 px-3 py-2">
+            <p className="text-xs text-slate-500">Tipo de contrato</p>
+            <p className="text-sm font-semibold capitalize text-slate-900">{contrato.tipo}</p>
+          </div>
+          <div className="rounded-md bg-slate-50 px-3 py-2">
+            <p className="text-xs text-slate-500">Estado</p>
+            <p className="text-sm font-semibold text-slate-900">
+              {ESTADO_LABELS[contrato.estado] ?? contrato.estado}
+            </p>
+          </div>
+          <div className="rounded-md bg-slate-50 px-3 py-2">
+            <p className="text-xs text-slate-500">Fecha de inicio</p>
+            <p className="text-sm font-semibold text-slate-900">
+              {formatDate(contrato.fecha_inicio)}
+            </p>
+          </div>
+          <div className="rounded-md bg-slate-50 px-3 py-2">
+            <p className="text-xs text-slate-500">Cuota inicial</p>
+            <p className="text-sm font-semibold text-slate-900">
+              {formatMoney(contrato.cuota_inicial, contrato.moneda)}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="rounded-md bg-slate-50 px-3 py-2">
+            <p className="text-xs text-slate-500">Total contratado</p>
+            <p className="text-sm font-semibold text-slate-900">
+              {formatMoney(resumen.totalMonto, contrato.moneda)}
+            </p>
+          </div>
+          <div className="rounded-md bg-green-50 px-3 py-2">
+            <p className="text-xs text-slate-500">Total pagado</p>
+            <p className="text-sm font-semibold text-green-800">
+              {formatMoney(resumen.totalPagado, contrato.moneda)}
+            </p>
+          </div>
+          <div className="rounded-md bg-amber-50 px-3 py-2">
+            <p className="text-xs text-slate-500">Saldo pendiente</p>
+            <p className="text-sm font-semibold text-amber-800">
+              {formatMoney(resumen.totalPendiente, contrato.moneda)}
+            </p>
+          </div>
+        </div>
+
+        <h2 className="mt-6 text-sm font-semibold text-slate-900">Cuotas pendientes de pago</h2>
+        {cuotasPendientes.length > 0 ? (
+          <div className="mt-2 overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="text-left text-xs uppercase text-slate-500">
+                <tr>
+                  <th className="py-1 pr-3">Cuota</th>
+                  <th className="py-1 pr-3">Vencimiento</th>
+                  <th className="py-1 pr-3">Monto</th>
+                  <th className="py-1 pr-3">Pagado</th>
+                  <th className="py-1 pr-3">Saldo</th>
+                  <th className="py-1 pr-3">Estado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {cuotasPendientes.map((c) => (
+                  <tr key={c.id}>
+                    <td className="py-1 pr-3">
+                      {c.numero_cuota === 0 ? "Inicial" : `#${c.numero_cuota}`}
+                    </td>
+                    <td className="py-1 pr-3 text-slate-600">
+                      {formatDate(c.fecha_vencimiento)}
+                    </td>
+                    <td className="py-1 pr-3 text-slate-600">
+                      {formatMoney(c.monto, contrato.moneda)}
+                    </td>
+                    <td className="py-1 pr-3 text-slate-600">
+                      {formatMoney(c.monto_pagado, contrato.moneda)}
+                    </td>
+                    <td className="py-1 pr-3 font-medium text-amber-800">
+                      {formatMoney(c.saldo, contrato.moneda)}
+                    </td>
+                    <td className="py-1 pr-3 text-slate-600">{c.estado}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-slate-200">
+                  <td className="py-1 pr-3 font-semibold text-slate-900" colSpan={4}>
+                    Total pendiente
+                  </td>
+                  <td className="py-1 pr-3 font-semibold text-amber-800">
+                    {formatMoney(totalSaldoPendiente, contrato.moneda)}
+                  </td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        ) : (
+          <p className="mt-2 text-sm text-slate-400">
+            Este contrato no tiene cuotas pendientes de pago.
+          </p>
+        )}
+
+        <h2 className="mt-6 text-sm font-semibold text-slate-900">Detalle de cuotas</h2>
+        <div className="mt-2 overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <thead className="text-left text-xs uppercase text-slate-500">
+              <tr>
+                <th className="py-1 pr-3">Cuota</th>
+                <th className="py-1 pr-3">Vencimiento</th>
+                <th className="py-1 pr-3">Monto</th>
+                <th className="py-1 pr-3">Pagado</th>
+                <th className="py-1 pr-3">Fecha de pago</th>
+                <th className="py-1 pr-3">Referencia</th>
+                <th className="py-1 pr-3">N.º Recibo</th>
+                <th className="py-1 pr-3">Estado</th>
+                <th className="py-1 pr-3 text-right print:hidden">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {detalle.map((c) => (
+                <tr key={c.id}>
+                  <td className="py-1 pr-3">
+                    {c.numero_cuota === 0 ? "Inicial" : `#${c.numero_cuota}`}
+                  </td>
+                  <td className="py-1 pr-3 text-slate-600">{formatDate(c.fecha_vencimiento)}</td>
+                  <td className="py-1 pr-3 text-slate-600">
+                    {formatMoney(c.monto, contrato.moneda)}
+                  </td>
+                  <td className="py-1 pr-3 text-slate-600">
+                    {formatMoney(c.monto_pagado, contrato.moneda)}
+                  </td>
+                  <td className="py-1 pr-3 text-slate-600">{formatDate(c.fecha_pago)}</td>
+                  <td className="py-1 pr-3 text-slate-600">{c.referencia ?? "-"}</td>
+                  <td className="py-1 pr-3 text-slate-600">{c.numero_recibo ?? "-"}</td>
+                  <td className="py-1 pr-3 text-slate-600">{c.estado}</td>
+                  <td className="py-1 pr-3 text-right print:hidden">
+                    <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                      <Link
+                        href={`/cuotas/${c.id}/editar`}
+                        className="text-xs text-slate-500 hover:text-slate-800 hover:underline"
+                      >
+                        Editar
+                      </Link>
+                      <form action={eliminarCuota.bind(null, c.id, contrato.id)}>
+                        <button
+                          type="submit"
+                          className="text-xs text-red-600 hover:text-red-800 hover:underline"
+                        >
+                          Eliminar
+                        </button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {detalle.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="py-4 text-center text-slate-400">
+                    Este contrato todavía no tiene cuotas generadas.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-4 rounded-md border border-dashed border-slate-300 p-3 print:hidden">
+          <h3 className="text-xs font-semibold uppercase text-slate-500">
+            Agregar cuota faltante
+          </h3>
+          <p className="mt-1 text-xs text-slate-400">
+            Se agrega al final del plan (con el siguiente número de cuota disponible).
+          </p>
+          <form
+            action={agregarCuota.bind(null, contrato.id)}
+            className="mt-2 flex flex-wrap items-end gap-2"
+          >
+            <div>
+              <label className="block text-xs font-medium text-slate-700">
+                Fecha de vencimiento
+              </label>
+              <input
+                type="date"
+                name="fecha_vencimiento"
+                required
+                className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-700">
+                Monto ({contrato.moneda})
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                name="monto"
+                required
+                className="mt-1 w-36 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              />
+            </div>
+            <button
+              type="submit"
+              className="rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-dark"
+            >
+              Agregar cuota
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
