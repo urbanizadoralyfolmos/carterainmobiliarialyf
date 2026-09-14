@@ -5,16 +5,10 @@ import { formatMoney, formatDate } from "@/lib/utils/format";
 function DescargarReporte({ tipo, anio }: { tipo: ReporteTipo; anio: number }) {
   return (
     <div className="flex gap-2">
-      
-        href={`/api/reportes/${tipo}/excel?anio=${anio}`}
-        className="rounded-md border border-slate-300 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-100"
-      >
+      <a href={`/api/reportes/${tipo}/excel?anio=${anio}`} className="rounded-md border border-slate-300 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-100">
         Excel
       </a>
-      
-        href={`/api/reportes/${tipo}/pdf?anio=${anio}`}
-        className="rounded-md border border-slate-300 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-100"
-      >
+      <a href={`/api/reportes/${tipo}/pdf?anio=${anio}`} className="rounded-md border border-slate-300 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-100">
         PDF
       </a>
     </div>
