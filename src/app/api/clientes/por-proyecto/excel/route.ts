@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { getClientesPorProyecto } from "@/lib/clientes-por-proyecto";
 
@@ -31,8 +31,14 @@ function headerCell(cell: ExcelJS.Cell, valor: string) {
   cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E9BD7" } };
 }
 
-export async function GET() {
-  const grupos = await getClientesPorProyecto();
+export async function GET(req: NextRequest) {
+  // El formulario de /clientes/exportar-excel manda `filtrado=1` junto con
+  // uno o más `proyecto=<id>` (o `proyecto=sin-proyecto`). Si no viene
+  // `filtrado`, es un enlace directo a este endpoint y se exporta todo, como
+  // antes de tener el selector.
+  const filtrado = req.nextUrl.searchParams.get("filtrado") === "1";
+  const seleccion = req.nextUrl.searchParams.getAll("proyecto");
+  const grupos = await getClientesPorProyecto(filtrado ? seleccion : undefined);
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Urbanizadora LYF Olmos";
