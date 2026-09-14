@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatMoney, formatDate } from "@/lib/utils/format";
-import { eliminarPropiedad } from "./actions";
+import { eliminarPropiedad, actualizarSuperficiePropiedad } from "./actions";
 import { SearchInput } from "@/components/SearchInput";
 
 const ESTADO_LABELS: Record<string, string> = {
@@ -21,9 +21,9 @@ const ESTADO_STYLES: Record<string, string> = {
 export default async function PropiedadesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ proyecto?: string; estado?: string; q?: string }>;
+  searchParams: Promise<{ proyecto?: string; estado?: string; q?: string; error?: string }>;
 }) {
-  const { proyecto: proyectoFiltro, estado: estadoFiltro, q } = await searchParams;
+  const { proyecto: proyectoFiltro, estado: estadoFiltro, q, error: errorParam } = await searchParams;
   const supabase = await createClient();
 
   let query = supabase
@@ -41,7 +41,7 @@ export default async function PropiedadesPage({
     query = query.eq("estado", estadoFiltro);
   }
 
-  const [{ data: propiedadesData, error }, { data: vinculos }, { data: proyectos }] =
+  const [{ data: propiedadesData, error: queryError }, { data: vinculos }, { data: proyectos }] =
     await Promise.all([
       query,
       supabase
@@ -99,6 +99,12 @@ export default async function PropiedadesPage({
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <SearchInput placeholder="Buscar por dirección, manzana, lote o ciudad..." />
       </div>
+
+      {errorParam && (
+        <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+          {errorParam}
+        </p>
+      )}
 
       <div className="mt-2 flex flex-wrap gap-1">
         <Link
@@ -158,9 +164,9 @@ export default async function PropiedadesPage({
         ))}
       </div>
 
-      {error && (
+      {queryError && (
         <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error.message}
+          {queryError.message}
         </p>
       )}
 
@@ -194,7 +200,22 @@ export default async function PropiedadesPage({
                     <td className="px-4 py-2 text-slate-600 capitalize">{p.tipo}</td>
                     <td className="px-4 py-2 text-slate-600">{p.ciudad ?? "-"}</td>
                     <td className="px-4 py-2 text-slate-600">
-                      {p.superficie_m2 ? p.superficie_m2 : "-"}
+                      <form
+                        action={actualizarSuperficiePropiedad.bind(null, p.id)}
+                        className="flex items-center gap-1"
+                      >
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          name="superficie_m2"
+                          defaultValue={p.superficie_m2 ?? ""}
+                          className="w-20 rounded-md border border-slate-300 px-1.5 py-1 text-sm"
+                        />
+                        <button type="submit" className="text-xs text-brand hover:underline">
+                          Guardar
+                        </button>
+                      </form>
                     </td>
                     <td className="px-4 py-2 text-slate-600">
                       {p.valor_referencia ? formatMoney(p.valor_referencia) : "-"}
