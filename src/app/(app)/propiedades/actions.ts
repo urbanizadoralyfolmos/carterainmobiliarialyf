@@ -69,3 +69,32 @@ export async function eliminarPropiedad(id: string) {
   revalidatePath("/propiedades");
   redirect("/propiedades");
 }
+
+/**
+ * Actualiza solo la superficie (m²) de una propiedad desde la lista, sin
+ * necesidad de entrar a la página de edición completa del lote. No toca
+ * ningún otro campo.
+ */
+export async function actualizarSuperficiePropiedad(id: string, formData: FormData) {
+  const supabase = await createClient();
+  const raw = formData.get("superficie_m2");
+  const texto = String(raw ?? "").trim();
+  const superficie_m2 = texto === "" ? null : Number(texto);
+
+  if (superficie_m2 !== null && (Number.isNaN(superficie_m2) || superficie_m2 < 0)) {
+    redirect(
+      `/propiedades?error=${encodeURIComponent("La superficie debe ser un número válido.")}`
+    );
+  }
+
+  const { error } = await supabase
+    .from("propiedades")
+    .update({ superficie_m2 })
+    .eq("id", id);
+
+  if (error) {
+    redirect(`/propiedades?error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath("/propiedades");
+}
