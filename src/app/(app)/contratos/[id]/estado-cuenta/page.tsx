@@ -77,8 +77,8 @@ export default async function EstadoCuentaContratoPage({
   return (
     <div>
       <div className="flex items-center justify-between print:hidden">
-        <Link href={`/contratos/${id}`} className="text-sm text-slate-500 hover:underline">
-          ← Volver al contrato
+        <Link href="/contratos" className="text-sm text-slate-500 hover:underline">
+          ← Volver a contratos
         </Link>
         <div className="flex gap-2">
           {DOWNLOAD_LINKS.map((link) => (
