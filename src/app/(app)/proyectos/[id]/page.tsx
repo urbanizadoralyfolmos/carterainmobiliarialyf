@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatMoney } from "@/lib/utils/format";
 import { ProyectoForm } from "@/components/ProyectoForm";
+import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { actualizarProyecto, eliminarProyecto, generarLotes } from "../actions";
 import { actualizarSuperficiePropiedad } from "@/app/(app)/propiedades/actions";
 
@@ -90,15 +91,18 @@ export default async function ProyectoDetallePage({
 
           <form action={eliminarConId} className="mt-4 max-w-2xl border-t border-slate-200 pt-4">
             <p className="text-xs text-slate-500">
-              Eliminar este proyecto no borra sus lotes: quedan como propiedades sin
-              proyecto asignado. Esta acción no se puede deshacer.
+              Eliminar este proyecto también elimina sus {lotes?.length ?? 0} lote(s)/propiedad(es).
+              Si alguno ya tiene un contrato asociado, no se podrá eliminar el proyecto hasta que
+              elimines o reasignes ese contrato primero. Esta acción no se puede deshacer.
             </p>
-            <button
-              type="submit"
+            <ConfirmSubmitButton
+              mensaje={`¿Eliminar el proyecto "${proyecto.nombre}" junto con sus ${
+                lotes?.length ?? 0
+              } lote(s)/propiedad(es)? Esta acción no se puede deshacer.`}
               className="mt-2 text-sm text-red-600 hover:text-red-800 hover:underline"
             >
               Eliminar proyecto
-            </button>
+            </ConfirmSubmitButton>
           </form>
         </div>
 
