@@ -11,6 +11,7 @@ function nombreProyecto(rel: ProyectoRel) {
 export const REPORTE_TIPOS = [
   { tipo: "recaudo", etiqueta: "Recaudo real por mes y proyecto" },
   { tipo: "recaudo-esperado", etiqueta: "Recaudo esperado por mes y proyecto" },
+  { tipo: "recaudo-esperado-por-anio", etiqueta: "Recaudo esperado por año y proyecto" },
   { tipo: "vencen-este-mes", etiqueta: "Cuotas que vencen este mes" },
   { tipo: "vencidas", etiqueta: "Cuotas vencidas" },
   { tipo: "escrituradas", etiqueta: "Lotes escriturados por proyecto" },
@@ -119,6 +120,12 @@ export type ReporteMesFila = {
   total: number;
 };
 
+export type ReporteAnioFila = {
+  anio: number;
+  porProyecto: Record<string, number>;
+  total: number;
+};
+
 export type ReporteCuota = {
   id: string;
   numero_cuota: number;
@@ -148,6 +155,12 @@ export type ReportesData = {
   filasPorMesEsperado: ReporteMesFila[];
   totalesPorProyectoEsperado: Record<string, number>;
   totalGeneralAnioEsperado: number;
+  // 2b) Recaudo esperado por año y proyecto (todas las cuotas programadas,
+  // sin importar el año seleccionado en el reporte anterior)
+  proyectosEsperadoPorAnio: string[];
+  filasPorAnioEsperado: ReporteAnioFila[];
+  totalesPorProyectoEsperadoPorAnio: Record<string, number>;
+  totalGeneralEsperadoPorAnio: number;
   // 3) y 4) Cuotas por vencer / vencidas
   cuotasVencenEsteMes: ReporteCuota[];
   totalVencenEsteMes: number;
@@ -202,6 +215,58 @@ function agruparPorMesYProyecto<T extends { fecha: string; monto: number; proyec
 }
 
 /**
+ * Igual que `agruparPorMesYProyecto` pero agrupando por año calendario en vez
+ * de por mes, y sin limitarse a los 12 meses de un único año: recorre todos
+ * los años que aparezcan en las filas recibidas (ideal para ver el recaudo
+ * esperado de varios años a la vez, no solo el año seleccionado en pantalla).
+ */
+function agruparPorAnioYProyecto<T extends { fecha: string; monto: number; proyectos: string[] }>(
+  filas: T[]
+) {
+  const proyectosSet = new Set<string>();
+  const aniosSet = new Set<number>();
+  const porAnioProyecto = new Map<number, Map<string, number>>();
+
+  for (const f of filas) {
+    const anio = Number(f.fecha.slice(0, 4));
+    aniosSet.add(anio);
+    if (!porAnioProyecto.has(anio)) porAnioProyecto.set(anio, new Map());
+    const proyectosDeFila = f.proyectos.length > 0 ? f.proyectos : ["Sin proyecto"];
+    for (const nombre of proyectosDeFila) {
+      proyectosSet.add(nombre);
+      const fila = porAnioProyecto.get(anio);
+      if (fila) fila.set(nombre, (fila.get(nombre) ?? 0) + f.monto);
+    }
+  }
+
+  const proyectos = Array.from(proyectosSet).sort((a, b) => {
+    if (a === "Sin proyecto") return 1;
+    if (b === "Sin proyecto") return -1;
+    return a.localeCompare(b);
+  });
+
+  const anios = Array.from(aniosSet).sort((a, b) => a - b);
+
+  const totalesPorProyecto: Record<string, number> = {};
+  let totalGeneral = 0;
+  const filasPorAnio: ReporteAnioFila[] = anios.map((anio) => {
+    const fila = porAnioProyecto.get(anio) ?? new Map<string, number>();
+    const porProyecto: Record<string, number> = {};
+    let total = 0;
+    for (const p of proyectos) {
+      const v = fila.get(p) ?? 0;
+      porProyecto[p] = v;
+      totalesPorProyecto[p] = (totalesPorProyecto[p] ?? 0) + v;
+      total += v;
+    }
+    totalGeneral += total;
+    return { anio, porProyecto, total };
+  });
+
+  return { anios, proyectos, filasPorAnio, totalesPorProyecto, totalGeneral };
+}
+
+/**
  * Calcula todos los datos del módulo de Reportes (recaudo real y esperado por
  * mes/proyecto, cuotas por vencer este mes, cuotas vencidas y lotes
  * escriturados por proyecto). Se usa tanto en la página de pantalla como en
@@ -218,6 +283,7 @@ export async function getReportes(anio: number): Promise<ReportesData> {
   const [
     { data: recibosData },
     { data: cuotasEsperadasData },
+    { data: cuotasEsperadasTodosAniosData },
     { data: cuotasData },
     { data: escrituradasData },
   ] = await Promise.all([
@@ -235,6 +301,14 @@ export async function getReportes(anio: number): Promise<ReportesData> {
       )
       .gte("fecha_vencimiento", `${anio}-01-01`)
       .lte("fecha_vencimiento", `${anio}-12-31`),
+    // Igual que la anterior pero sin filtrar por año: alimenta la tabla de
+    // "recaudo esperado por año", que muestra todos los años con cuotas
+    // programadas de una sola vez.
+    supabase
+      .from("cuotas")
+      .select(
+        "monto, fecha_vencimiento, contratos(contrato_propiedades(propiedades(direccion, proyectos(nombre))))"
+      ),
     supabase
       .from("cuotas")
       .select(
@@ -268,6 +342,16 @@ export async function getReportes(anio: number): Promise<ReportesData> {
     })
   );
   const recaudoEsperado = agruparPorMesYProyecto(filasRecaudoEsperado);
+
+  // --- 2b) Dinero recaudado esperado por año y proyecto (todos los años) ---
+  const filasRecaudoEsperadoPorAnio = (
+    (cuotasEsperadasTodosAniosData ?? []) as unknown as CuotasEsperadasRow[]
+  ).map((c) => ({
+    fecha: c.fecha_vencimiento,
+    monto: Number(c.monto),
+    proyectos: proyectosDe(c.contratos),
+  }));
+  const recaudoEsperadoPorAnio = agruparPorAnioYProyecto(filasRecaudoEsperadoPorAnio);
 
   // --- 3) y 4) Cuotas por vencer este mes / ya vencidas ---
   const cuotasBase = ((cuotasData ?? []) as unknown as CuotaReporteRow[]).map((c) => ({
@@ -323,6 +407,10 @@ export async function getReportes(anio: number): Promise<ReportesData> {
     filasPorMesEsperado: recaudoEsperado.filasPorMes,
     totalesPorProyectoEsperado: recaudoEsperado.totalesPorProyecto,
     totalGeneralAnioEsperado: recaudoEsperado.totalGeneralAnio,
+    proyectosEsperadoPorAnio: recaudoEsperadoPorAnio.proyectos,
+    filasPorAnioEsperado: recaudoEsperadoPorAnio.filasPorAnio,
+    totalesPorProyectoEsperadoPorAnio: recaudoEsperadoPorAnio.totalesPorProyecto,
+    totalGeneralEsperadoPorAnio: recaudoEsperadoPorAnio.totalGeneral,
     cuotasVencenEsteMes,
     totalVencenEsteMes,
     cuotasVencidas,
