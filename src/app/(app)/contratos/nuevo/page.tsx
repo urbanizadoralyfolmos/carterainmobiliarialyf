@@ -14,7 +14,7 @@ export default async function NuevoContratoPage({
     supabase.from("clientes").select("id, nombre, apellido").order("apellido"),
     supabase
       .from("propiedades")
-      .select("id, direccion, manzana, numero_lote, proyectos(nombre)")
+      .select("id, direccion, manzana, numero_lote, proyectos(id, nombre)")
       .eq("estado", "disponible")
       .order("direccion"),
   ]);

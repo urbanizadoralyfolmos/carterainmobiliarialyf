@@ -1,12 +1,13 @@
 "use client";
 
 /**
- * Casilla "seleccionar todas" para el listado de Propiedades: al marcarla o
- * desmarcarla, marca/desmarca todas las casillas `propiedad_ids` del mismo
- * formulario, para poder elegir varias propiedades de una vez antes de
- * eliminarlas.
+ * Casilla "seleccionar todas" reutilizable para listados con selección
+ * múltiple (Propiedades, Contratos): al marcarla o desmarcarla, marca/
+ * desmarca todas las casillas con el `name` indicado dentro del mismo
+ * formulario, para poder elegir varios registros de una vez antes de
+ * aplicarles una acción en bloque (eliminar, cambiar estado, etc.).
  */
-export function SeleccionarTodasCheckbox() {
+export function SeleccionarTodasCheckbox({ name = "propiedad_ids" }: { name?: string }) {
   return (
     <input
       type="checkbox"
@@ -15,7 +16,7 @@ export function SeleccionarTodasCheckbox() {
       onChange={(e) => {
         const form = e.currentTarget.closest("form");
         const casillas =
-          form?.querySelectorAll<HTMLInputElement>('input[name="propiedad_ids"]') ?? [];
+          form?.querySelectorAll<HTMLInputElement>(`input[name="${name}"]`) ?? [];
         casillas.forEach((casilla) => {
           casilla.checked = e.currentTarget.checked;
         });

@@ -32,7 +32,7 @@ export default async function EditarContratoPage({
       supabase.from("clientes").select("id, nombre, apellido").order("apellido"),
       supabase
         .from("propiedades")
-        .select("id, direccion, manzana, numero_lote, proyectos(nombre)")
+        .select("id, direccion, manzana, numero_lote, proyectos(id, nombre)")
         .order("direccion"),
       supabase.from("contrato_propiedades").select("propiedad_id").eq("contrato_id", id),
     ]);
@@ -47,12 +47,17 @@ export default async function EditarContratoPage({
         <h1 className="text-lg font-semibold text-slate-900">
           Editar contrato N.º {contrato.numero}
         </h1>
-        <Link
-          href={`/contratos/${id}/estado-cuenta`}
-          className="text-sm text-slate-500 hover:underline"
-        >
-          Ver estado de cuenta
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link href="/contratos" className="text-sm text-slate-500 hover:underline">
+            ← Volver a contratos
+          </Link>
+          <Link
+            href={`/contratos/${id}/estado-cuenta`}
+            className="text-sm text-slate-500 hover:underline"
+          >
+            Ver estado de cuenta
+          </Link>
+        </div>
       </div>
       <ContratoForm
         contrato={contrato}

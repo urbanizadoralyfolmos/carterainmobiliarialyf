@@ -17,7 +17,7 @@ export function ContratoForm({
   contrato?: Partial<Contrato>;
   clientes: Pick<Cliente, "id" | "nombre" | "apellido">[];
   propiedades: (Pick<Propiedad, "id" | "direccion" | "manzana" | "numero_lote"> & {
-    proyectos?: { nombre: string } | { nombre: string }[] | null;
+    proyectos?: { id: string; nombre: string } | { id: string; nombre: string }[] | null;
   })[];
   /** ids de las propiedades ya vinculadas a este contrato (para editar). */
   propiedadIdsSeleccionadas?: string[];
@@ -35,6 +35,8 @@ export function ContratoForm({
   const [seleccionadas, setSeleccionadas] = useState<Set<string>>(
     new Set(propiedadIdsSeleccionadas)
   );
+  const [proyectoFiltro, setProyectoFiltro] = useState("todos");
+  const [busquedaPropiedad, setBusquedaPropiedad] = useState("");
 
   function toggleSeleccionada(id: string) {
     setSeleccionadas((prev) => {
@@ -55,6 +57,31 @@ export function ContratoForm({
 
   const totalCuotas = montos.reduce((acc, m) => acc + (Number(m) || 0), 0);
   const clienteActual = clientes.find((c) => c.id === contrato?.cliente_id);
+
+  // Lista de proyectos con al menos una propiedad disponible para elegir, para
+  // poder filtrar por proyecto y encontrar el lote más rápido en vez de
+  // recorrer una lista larga con todos los lotes de todos los proyectos.
+  const proyectosDisponibles = Array.from(
+    new Map(
+      propiedades
+        .map((p) => (Array.isArray(p.proyectos) ? p.proyectos[0] : p.proyectos))
+        .filter((pr): pr is { id: string; nombre: string } => Boolean(pr))
+        .map((pr) => [pr.id, pr])
+    ).values()
+  ).sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+  const terminoPropiedad = busquedaPropiedad.trim().toLowerCase();
+  const propiedadesFiltradas = propiedades.filter((p) => {
+    const proyecto = Array.isArray(p.proyectos) ? p.proyectos[0] : p.proyectos;
+    if (proyectoFiltro !== "todos" && proyecto?.id !== proyectoFiltro) return false;
+    if (!terminoPropiedad) return true;
+    return (
+      p.direccion.toLowerCase().includes(terminoPropiedad) ||
+      (p.manzana ?? "").toLowerCase().includes(terminoPropiedad) ||
+      (p.numero_lote ?? "").toLowerCase().includes(terminoPropiedad) ||
+      (proyecto?.nombre ?? "").toLowerCase().includes(terminoPropiedad)
+    );
+  });
 
   return (
     <form action={action} className="mt-4 max-w-3xl">
@@ -96,8 +123,29 @@ export function ContratoForm({
             Un contrato puede incluir uno o varios lotes (por ejemplo, varios lotes de la
             misma manzana vendidos juntos).
           </p>
-          <div className="mt-1 max-h-48 overflow-y-auto rounded-md border border-slate-300 p-2">
-            {propiedades.map((p) => {
+          <div className="mt-1 flex flex-wrap gap-2">
+            <select
+              value={proyectoFiltro}
+              onChange={(e) => setProyectoFiltro(e.target.value)}
+              className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+            >
+              <option value="todos">Todos los proyectos</option>
+              {proyectosDisponibles.map((pr) => (
+                <option key={pr.id} value={pr.id}>
+                  {pr.nombre}
+                </option>
+              ))}
+            </select>
+            <input
+              type="text"
+              value={busquedaPropiedad}
+              onChange={(e) => setBusquedaPropiedad(e.target.value)}
+              placeholder="Buscar por dirección, manzana o lote..."
+              className="min-w-[16rem] flex-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+            />
+          </div>
+          <div className="mt-2 max-h-48 overflow-y-auto rounded-md border border-slate-300 p-2">
+            {propiedadesFiltradas.map((p) => {
               const proyecto = Array.isArray(p.proyectos) ? p.proyectos[0] : p.proyectos;
               const detalle = [
                 proyecto?.nombre,
@@ -126,6 +174,11 @@ export function ContratoForm({
                 </label>
               );
             })}
+            {propiedadesFiltradas.length === 0 && propiedades.length > 0 && (
+              <p className="px-1.5 py-1 text-sm text-slate-400">
+                Ningún lote coincide con el proyecto o la búsqueda.
+              </p>
+            )}
             {propiedades.length === 0 && (
               <p className="px-1.5 py-1 text-sm text-slate-400">
                 No hay propiedades cargadas todavía.
@@ -321,8 +374,9 @@ export function ContratoForm({
         </div>
       ) : (
         <p className="mt-6 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-700">
-          El plan de cuotas ya generado no se modifica desde aquí. Para ajustar montos
-          de cuotas puntuales, hazlo desde la sección &quot;Cuotas&quot;.
+          El plan de cuotas ya generado no se modifica desde aquí. Para editar, agregar o
+          eliminar cuotas puntuales, hazlo desde el estado de cuenta de este contrato
+          (sección &quot;Detalle de cuotas&quot;).
         </p>
       )}
 

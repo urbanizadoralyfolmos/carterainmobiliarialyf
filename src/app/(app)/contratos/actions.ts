@@ -201,6 +201,76 @@ export async function actualizarContrato(id: string, formData: FormData) {
   redirect("/contratos");
 }
 
+const ESTADOS_CONTRATO_VALIDOS = [
+  "activo",
+  "paz_y_salvo_sin_escritura",
+  "escriturado",
+  "anulado",
+];
+
+/**
+ * Cambia el estado de varios contratos marcados con checkbox de una sola
+ * vez, desde el listado de Contratos ("Editar estado en bloque"). Si alguno
+ * de los contratos que se están actualizando queda "anulado" y antes no lo
+ * estaba, se liberan sus propiedades/lotes vinculados (misma lógica que al
+ * editar un contrato individualmente).
+ */
+export async function actualizarEstadoEnBloque(formData: FormData) {
+  const redirectTo = String(formData.get("redirect_to") ?? "").trim() || "/contratos";
+  await requireAdmin(redirectTo);
+  const supabase = await createClient();
+
+  const ids = formData.getAll("contrato_ids").map(String).filter(Boolean);
+  const nuevoEstado = String(formData.get("nuevo_estado") ?? "").trim();
+
+  if (ids.length === 0) {
+    redirect(`${redirectTo}?error=${encodeURIComponent("No seleccionaste ningún contrato.")}`);
+  }
+  if (!ESTADOS_CONTRATO_VALIDOS.includes(nuevoEstado)) {
+    redirect(`${redirectTo}?error=${encodeURIComponent("Selecciona un estado válido.")}`);
+  }
+
+  const { data: contratosAnteriores } = await supabase
+    .from("contratos")
+    .select("id, estado")
+    .in("id", ids);
+
+  const { error } = await supabase
+    .from("contratos")
+    .update({ estado: nuevoEstado })
+    .in("id", ids);
+
+  if (error) {
+    redirect(`${redirectTo}?error=${encodeURIComponent(error.message)}`);
+  }
+
+  if (nuevoEstado === "anulado") {
+    const idsQuePasanAAnulado = (contratosAnteriores ?? [])
+      .filter((c) => c.estado !== "anulado")
+      .map((c) => c.id);
+
+    if (idsQuePasanAAnulado.length > 0) {
+      const { data: vinculos } = await supabase
+        .from("contrato_propiedades")
+        .select("propiedad_id")
+        .in("contrato_id", idsQuePasanAAnulado);
+      const propiedadIds = (vinculos ?? []).map((v) => v.propiedad_id);
+
+      if (propiedadIds.length > 0) {
+        await supabase
+          .from("propiedades")
+          .update({ estado: "disponible" })
+          .in("id", propiedadIds)
+          .eq("estado", "prometido_en_venta");
+      }
+    }
+  }
+
+  revalidatePath("/contratos");
+  revalidatePath("/propiedades");
+  redirect(redirectTo);
+}
+
 export async function eliminarContrato(id: string) {
   await requireAdmin("/contratos");
   const supabase = await createClient();
