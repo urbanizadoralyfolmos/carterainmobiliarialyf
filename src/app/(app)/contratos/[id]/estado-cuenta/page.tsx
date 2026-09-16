@@ -1,17 +1,22 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 import { formatMoney, formatDate } from "@/lib/utils/format";
 import { PrintButton } from "@/components/PrintButton";
+import { OtrosiPlanPagoForm } from "@/components/OtrosiPlanPagoForm";
 import { getEstadoCuentaContrato } from "@/lib/estado-cuenta-contrato";
 import { agregarCuota, eliminarCuota } from "@/app/(app)/cuotas/actions";
+import { cederContrato, reestructurarPlanPago } from "@/app/(app)/contratos/actions";
 import { esAdmin } from "@/lib/auth/rol";
 
 const ESTADO_LABELS: Record<string, string> = {
   activo: "Activo",
-  cedido: "Cedido",
+  paz_y_salvo_sin_escritura: "Paz y salvo sin escritura",
   escriturado: "Escriturado",
-  cancelado: "Cancelado",
+  anulado: "Anulado",
 };
+
+type CuotaSnapshot = { numero_cuota: number; fecha_vencimiento: string; monto: number };
 
 const DOWNLOAD_LINKS = [
   { tipo: "excel", etiqueta: "Descargar Excel" },
@@ -23,10 +28,10 @@ export default async function EstadoCuentaContratoPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; cedido?: string; otrosi?: string }>;
 }) {
   const { id } = await params;
-  const { error } = await searchParams;
+  const { error, cedido, otrosi } = await searchParams;
   const data = await getEstadoCuentaContrato(id);
   const admin = await esAdmin();
 
@@ -35,6 +40,39 @@ export default async function EstadoCuentaContratoPage({
   const { contrato, cliente, nombreCliente, propiedades, resumen, cuotasPendientes } = data;
   const detalle = [...resumen.detalle].sort((a, b) => a.numero_cuota - b.numero_cuota);
   const totalSaldoPendiente = cuotasPendientes.reduce((acc, c) => acc + c.saldo, 0);
+
+  // Saldo elegible para un otrosí: solo cuotas "pendiente" (sin ningún
+  // abono todavía). Las que tienen abono parcial o ya están pagadas no se
+  // tocan con la reestructuración.
+  const saldoReestructurable = detalle
+    .filter((c) => c.estado === "pendiente")
+    .reduce((acc, c) => acc + c.monto, 0);
+
+  const supabase = await createClient();
+  const [{ data: clientesData }, { data: cesionesData }, { data: otrosiesData }] =
+    await Promise.all([
+      supabase.from("clientes").select("id, nombre, apellido").order("apellido"),
+      supabase
+        .from("cesiones_contrato")
+        .select(
+          "id, fecha, nota, cliente_anterior:clientes!cesiones_contrato_cliente_anterior_id_fkey(nombre, apellido), cliente_nuevo:clientes!cesiones_contrato_cliente_nuevo_id_fkey(nombre, apellido)"
+        )
+        .eq("contrato_id", id)
+        .order("fecha", { ascending: false }),
+      supabase
+        .from("otrosies_contrato")
+        .select("id, fecha, motivo, saldo_reestructurado, cuotas_anteriores, cuotas_nuevas")
+        .eq("contrato_id", id)
+        .order("fecha", { ascending: false }),
+    ]);
+
+  type ClienteNombre = { nombre: string; apellido: string } | { nombre: string; apellido: string }[] | null;
+  function nombreDe(rel: ClienteNombre) {
+    const c = Array.isArray(rel) ? rel[0] : rel;
+    return c ? `${c.apellido}, ${c.nombre}` : "-";
+  }
+
+  const clientesParaCeder = (clientesData ?? []).filter((c) => c.id !== contrato.cliente_id);
 
   return (
     <div>
@@ -59,6 +97,16 @@ export default async function EstadoCuentaContratoPage({
       {error && (
         <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 print:hidden">
           {error}
+        </p>
+      )}
+      {cedido && (
+        <p className="mt-3 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700 print:hidden">
+          Cesión registrada correctamente.
+        </p>
+      )}
+      {otrosi && (
+        <p className="mt-3 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700 print:hidden">
+          Otrosí registrado y plan de cuotas reestructurado.
         </p>
       )}
 
@@ -325,6 +373,142 @@ export default async function EstadoCuentaContratoPage({
               Agregar cuota
             </button>
           </form>
+        </div>
+
+        <div className="mt-6 border-t border-slate-200 pt-4 print:hidden">
+          <h2 className="text-sm font-semibold text-slate-900">Cesiones</h2>
+          <p className="mt-1 text-xs text-slate-400">
+            Cuando el comprador cede sus derechos a un tercero, el contrato sigue con su
+            estado normal (no existe un estado &quot;cedido&quot;); aquí queda el registro de
+            quién era el titular antes y quién es ahora.
+          </p>
+
+          {(cesionesData?.length ?? 0) > 0 && (
+            <div className="mt-2 overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-200 text-sm">
+                <thead className="text-left text-xs uppercase text-slate-500">
+                  <tr>
+                    <th className="py-1 pr-3">Fecha</th>
+                    <th className="py-1 pr-3">De</th>
+                    <th className="py-1 pr-3">A</th>
+                    <th className="py-1 pr-3">Nota</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {cesionesData!.map((c) => (
+                    <tr key={c.id}>
+                      <td className="py-1 pr-3 text-slate-600">{formatDate(c.fecha)}</td>
+                      <td className="py-1 pr-3 text-slate-600">{nombreDe(c.cliente_anterior)}</td>
+                      <td className="py-1 pr-3 font-medium text-slate-900">
+                        {nombreDe(c.cliente_nuevo)}
+                      </td>
+                      <td className="py-1 pr-3 text-slate-500">{c.nota ?? "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {admin && (
+            <form
+              action={cederContrato.bind(null, contrato.id)}
+              className="mt-3 flex flex-wrap items-end gap-2 rounded-md border border-dashed border-slate-300 p-3"
+            >
+              <div>
+                <label className="block text-xs font-medium text-slate-700">
+                  Ceder contrato a
+                </label>
+                <select
+                  name="cliente_nuevo_id"
+                  required
+                  defaultValue=""
+                  className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                >
+                  <option value="" disabled>
+                    Seleccionar cliente...
+                  </option>
+                  {clientesParaCeder.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.apellido}, {c.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Fecha</label>
+                <input
+                  type="date"
+                  name="fecha"
+                  defaultValue={new Date().toISOString().slice(0, 10)}
+                  className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                />
+              </div>
+              <div className="min-w-[16rem] flex-1">
+                <label className="block text-xs font-medium text-slate-700">
+                  Nota (opcional)
+                </label>
+                <input
+                  type="text"
+                  name="nota"
+                  placeholder="Ej: cesión notarial N.º..."
+                  className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                />
+              </div>
+              <button
+                type="submit"
+                className="rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-dark"
+              >
+                Ceder contrato
+              </button>
+            </form>
+          )}
+        </div>
+
+        <div className="mt-6 border-t border-slate-200 pt-4 print:hidden">
+          <h2 className="text-sm font-semibold text-slate-900">Otrosíes (cambios de forma de pago)</h2>
+          <p className="mt-1 text-xs text-slate-400">
+            Reestructura el saldo pendiente (solo cuotas sin ningún abono) en un nuevo plan de
+            cuotas. Queda registrado el motivo y las cuotas antes/después.
+          </p>
+
+          {(otrosiesData?.length ?? 0) > 0 && (
+            <div className="mt-2 space-y-2">
+              {otrosiesData!.map((o) => {
+                const anteriores = (o.cuotas_anteriores as CuotaSnapshot[] | null) ?? [];
+                const nuevas = (o.cuotas_nuevas as CuotaSnapshot[] | null) ?? [];
+                return (
+                  <div key={o.id} className="rounded-md bg-slate-50 p-3 text-sm">
+                    <p className="font-medium text-slate-900">
+                      {formatDate(o.fecha)} · {formatMoney(o.saldo_reestructurado, contrato.moneda)}{" "}
+                      reestructurados en {nuevas.length} cuota{nuevas.length === 1 ? "" : "s"}{" "}
+                      (antes {anteriores.length})
+                    </p>
+                    <p className="mt-1 text-slate-600">{o.motivo}</p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {admin && (
+            <div className="mt-3 rounded-md border border-dashed border-slate-300 p-3">
+              {saldoReestructurable > 0 ? (
+                <OtrosiPlanPagoForm
+                  action={reestructurarPlanPago.bind(null, contrato.id)}
+                  saldoPendiente={saldoReestructurable}
+                  moneda={contrato.moneda}
+                  diaVencimientoActual={contrato.dia_vencimiento}
+                />
+              ) : (
+                <p className="text-sm text-slate-400">
+                  Este contrato no tiene cuotas pendientes sin abonos para reestructurar (las
+                  cuotas con abono parcial no se incluyen automáticamente; edítalas
+                  manualmente si hace falta).
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

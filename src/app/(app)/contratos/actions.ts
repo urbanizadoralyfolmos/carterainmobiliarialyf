@@ -122,8 +122,9 @@ export async function crearContrato(formData: FormData) {
 export async function actualizarContrato(id: string, formData: FormData) {
   await requireAdmin(`/contratos/${id}`);
   const supabase = await createClient();
-  const data = readContratoForm(formData);
+  const { cliente_id: _clienteIdIgnorado, ...data } = readContratoForm(formData);
   const propiedadIds = readPropiedadIds(formData);
+  void _clienteIdIgnorado;
 
   if (propiedadIds.length === 0) {
     redirect(
@@ -131,8 +132,19 @@ export async function actualizarContrato(id: string, formData: FormData) {
     );
   }
 
+  // El titular (cliente) de un contrato ya no se cambia desde este
+  // formulario: cualquier cambio de comprador se hace con "Ceder contrato"
+  // (ver cederContrato más abajo), para que siempre quede un registro de la
+  // cesión. Por eso "cliente_id" se descarta aunque venga en el formulario.
+  const { data: contratoAnterior } = await supabase
+    .from("contratos")
+    .select("estado")
+    .eq("id", id)
+    .single();
+
   // No se regenera el plan de cuotas al editar: solo se actualizan los
-  // datos del contrato. El plan de cuotas se gestiona desde /cuotas.
+  // datos del contrato. El plan de cuotas se gestiona desde /cuotas o con
+  // un otrosí (ver reestructurarPlanPago).
   const { error } = await supabase.from("contratos").update(data).eq("id", id);
   if (error) {
     redirect(`/contratos/${id}?error=${encodeURIComponent(error.message)}`);
@@ -170,6 +182,20 @@ export async function actualizarContrato(id: string, formData: FormData) {
       .eq("estado", "disponible");
   }
 
+  // Si el contrato pasó a "anulado" recién ahora, se liberan sus
+  // propiedades/lotes (las que seguían en "prometido en venta") para que
+  // vuelvan a quedar disponibles para la venta.
+  if (data.estado === "anulado" && contratoAnterior?.estado !== "anulado") {
+    const idsVinculadas = [...idsNuevos];
+    if (idsVinculadas.length > 0) {
+      await supabase
+        .from("propiedades")
+        .update({ estado: "disponible" })
+        .in("id", idsVinculadas)
+        .eq("estado", "prometido_en_venta");
+    }
+  }
+
   revalidatePath("/contratos");
   revalidatePath("/propiedades");
   redirect("/contratos");
@@ -178,10 +204,230 @@ export async function actualizarContrato(id: string, formData: FormData) {
 export async function eliminarContrato(id: string) {
   await requireAdmin("/contratos");
   const supabase = await createClient();
+
+  // Se capturan las propiedades vinculadas ANTES de borrar el contrato
+  // (el borrado elimina en cascada esos vínculos), para poder liberarlas
+  // después y que no queden marcadas "prometido en venta" para siempre.
+  const { data: vinculos } = await supabase
+    .from("contrato_propiedades")
+    .select("propiedad_id")
+    .eq("contrato_id", id);
+  const propiedadIds = (vinculos ?? []).map((v) => v.propiedad_id);
+
   await supabase.from("contratos").delete().eq("id", id);
+
+  if (propiedadIds.length > 0) {
+    await supabase
+      .from("propiedades")
+      .update({ estado: "disponible" })
+      .in("id", propiedadIds)
+      .eq("estado", "prometido_en_venta");
+  }
+
   revalidatePath("/contratos");
   revalidatePath("/cuotas");
+  revalidatePath("/propiedades");
   redirect("/contratos");
+}
+
+/**
+ * Registra la cesión de un contrato a otro cliente (el comprador original
+ * transfiere sus derechos a un tercero). El contrato mantiene su estado
+ * normal — no existe un estado "cedido" separado — y queda un registro en
+ * `cesiones_contrato` con quién era el titular anterior, quién es el nuevo,
+ * la fecha y una nota. El historial se guarda ANTES de cambiar el cliente
+ * del contrato: así, si algo falla al actualizar el contrato, al menos
+ * queda constancia de que la cesión se intentó, en vez de perder el rastro.
+ */
+export async function cederContrato(contratoId: string, formData: FormData) {
+  await requireAdmin(`/contratos/${contratoId}/estado-cuenta`);
+  const supabase = await createClient();
+
+  const clienteNuevoId = String(formData.get("cliente_nuevo_id") ?? "").trim();
+  const fecha = String(formData.get("fecha") ?? "").trim() || undefined;
+  const nota = String(formData.get("nota") ?? "").trim() || null;
+
+  if (!clienteNuevoId) {
+    redirect(
+      `/contratos/${contratoId}/estado-cuenta?error=${encodeURIComponent(
+        "Selecciona el cliente al que se cede el contrato."
+      )}`
+    );
+  }
+
+  const { data: contratoActual } = await supabase
+    .from("contratos")
+    .select("cliente_id")
+    .eq("id", contratoId)
+    .single();
+
+  if (!contratoActual) {
+    redirect(
+      `/contratos/${contratoId}/estado-cuenta?error=${encodeURIComponent(
+        "No se encontró el contrato."
+      )}`
+    );
+  }
+
+  if (contratoActual!.cliente_id === clienteNuevoId) {
+    redirect(
+      `/contratos/${contratoId}/estado-cuenta?error=${encodeURIComponent(
+        "Ese cliente ya es el titular actual del contrato."
+      )}`
+    );
+  }
+
+  const { error: errorHistorial } = await supabase.from("cesiones_contrato").insert({
+    contrato_id: contratoId,
+    cliente_anterior_id: contratoActual!.cliente_id,
+    cliente_nuevo_id: clienteNuevoId,
+    ...(fecha ? { fecha } : {}),
+    nota,
+  });
+
+  if (errorHistorial) {
+    redirect(`/contratos/${contratoId}/estado-cuenta?error=${encodeURIComponent(errorHistorial.message)}`);
+  }
+
+  const { error: errorCliente } = await supabase
+    .from("contratos")
+    .update({ cliente_id: clienteNuevoId })
+    .eq("id", contratoId);
+
+  if (errorCliente) {
+    redirect(`/contratos/${contratoId}/estado-cuenta?error=${encodeURIComponent(errorCliente.message)}`);
+  }
+
+  revalidatePath(`/contratos/${contratoId}/estado-cuenta`);
+  revalidatePath("/contratos");
+  revalidatePath("/clientes");
+  redirect(`/contratos/${contratoId}/estado-cuenta?cedido=1`);
+}
+
+/**
+ * Otrosí: reestructura el saldo pendiente de un contrato en un nuevo plan
+ * de cuotas (nueva cantidad, nuevas fechas y montos). Solo toca las cuotas
+ * "pendiente" (las que todavía no tienen ningún abono) — las pagadas o con
+ * abono parcial no se tocan. Queda un registro en `otrosies_contrato` con
+ * el motivo y una copia de las cuotas antes/después.
+ */
+export async function reestructurarPlanPago(contratoId: string, formData: FormData) {
+  await requireAdmin(`/contratos/${contratoId}/estado-cuenta`);
+  const supabase = await createClient();
+
+  const motivo = String(formData.get("motivo") ?? "").trim();
+  const fechaPrimeraCuota = String(formData.get("fecha_primera_cuota") ?? "").trim();
+  const cantidad = Math.max(1, Math.min(120, Number(formData.get("cantidad_cuotas") ?? 0)));
+
+  if (!motivo) {
+    redirect(
+      `/contratos/${contratoId}/estado-cuenta?error=${encodeURIComponent(
+        "Indica el motivo del otrosí."
+      )}`
+    );
+  }
+  if (!fechaPrimeraCuota || !cantidad) {
+    redirect(
+      `/contratos/${contratoId}/estado-cuenta?error=${encodeURIComponent(
+        "Indica la fecha de la primera cuota nueva y la cantidad de cuotas."
+      )}`
+    );
+  }
+
+  const { data: contrato } = await supabase
+    .from("contratos")
+    .select("dia_vencimiento")
+    .eq("id", contratoId)
+    .single();
+
+  if (!contrato) {
+    redirect(
+      `/contratos/${contratoId}/estado-cuenta?error=${encodeURIComponent(
+        "No se encontró el contrato."
+      )}`
+    );
+  }
+
+  const { data: cuotasPendientes } = await supabase
+    .from("cuotas")
+    .select("id, numero_cuota, fecha_vencimiento, monto")
+    .eq("contrato_id", contratoId)
+    .eq("estado", "pendiente")
+    .order("numero_cuota");
+
+  if (!cuotasPendientes || cuotasPendientes.length === 0) {
+    redirect(
+      `/contratos/${contratoId}/estado-cuenta?error=${encodeURIComponent(
+        "Este contrato no tiene cuotas pendientes (sin abonos) para reestructurar."
+      )}`
+    );
+  }
+
+  const { data: cuotaRestanteMasAlta } = await supabase
+    .from("cuotas")
+    .select("numero_cuota")
+    .eq("contrato_id", contratoId)
+    .neq("estado", "pendiente")
+    .order("numero_cuota", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const numeroInicio = (cuotaRestanteMasAlta?.numero_cuota ?? 0) + 1;
+
+  const montos = formData
+    .getAll("monto_nueva_cuota")
+    .slice(0, cantidad)
+    .map((m) => Number(m) || 0);
+
+  const fechas = generarFechasCuotas(fechaPrimeraCuota, cantidad, contrato!.dia_vencimiento, 0);
+
+  const cuotasAnterioresSnapshot = cuotasPendientes.map((c) => ({
+    numero_cuota: c.numero_cuota,
+    fecha_vencimiento: c.fecha_vencimiento,
+    monto: c.monto,
+  }));
+
+  const idsABorrar = cuotasPendientes.map((c) => c.id);
+  const { error: errorBorrar } = await supabase.from("cuotas").delete().in("id", idsABorrar);
+  if (errorBorrar) {
+    redirect(`/contratos/${contratoId}/estado-cuenta?error=${encodeURIComponent(errorBorrar.message)}`);
+  }
+
+  const nuevasCuotas = fechas.map((fecha, i) => ({
+    contrato_id: contratoId,
+    numero_cuota: numeroInicio + i,
+    fecha_vencimiento: fecha,
+    monto: montos[i] ?? 0,
+    monto_pagado: 0,
+    estado: "pendiente",
+  }));
+
+  const { error: errorInsertar } = await supabase.from("cuotas").insert(nuevasCuotas);
+  if (errorInsertar) {
+    redirect(`/contratos/${contratoId}/estado-cuenta?error=${encodeURIComponent(errorInsertar.message)}`);
+  }
+
+  await supabase.from("otrosies_contrato").insert({
+    contrato_id: contratoId,
+    motivo,
+    saldo_reestructurado: cuotasAnterioresSnapshot.reduce((acc, c) => acc + c.monto, 0),
+    cuotas_anteriores: cuotasAnterioresSnapshot,
+    cuotas_nuevas: nuevasCuotas.map(({ numero_cuota, fecha_vencimiento, monto }) => ({
+      numero_cuota,
+      fecha_vencimiento,
+      monto,
+    })),
+  });
+
+  // El plan de cuotas cambió por completo: se sincroniza el estado del
+  // contrato por si esto lo saca de "paz y salvo sin escritura" (ahora
+  // tiene cuotas pendientes de nuevo).
+  await supabase.rpc("sincronizar_estado_contrato_por_pagos", { p_contrato_id: contratoId });
+
+  revalidatePath(`/contratos/${contratoId}/estado-cuenta`);
+  revalidatePath("/cuotas");
+  revalidatePath("/dashboard");
+  redirect(`/contratos/${contratoId}/estado-cuenta?otrosi=1`);
 }
 
 /**

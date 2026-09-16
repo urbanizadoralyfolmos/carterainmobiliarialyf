@@ -7,17 +7,24 @@ import { esAdmin } from "@/lib/auth/rol";
 
 const ESTADO_STYLES: Record<string, string> = {
   activo: "bg-green-100 text-green-800",
+  paz_y_salvo_sin_escritura: "bg-amber-100 text-amber-800",
   escriturado: "bg-blue-100 text-blue-800",
-  cedido: "bg-amber-100 text-amber-800",
-  cancelado: "bg-red-100 text-red-800",
+  anulado: "bg-red-100 text-red-800",
+};
+
+const ESTADO_LABELS: Record<string, string> = {
+  activo: "Activo",
+  paz_y_salvo_sin_escritura: "Paz y salvo sin escritura",
+  escriturado: "Escriturado",
+  anulado: "Anulado",
 };
 
 const ESTADOS = [
   { value: "todos", label: "Todos" },
   { value: "activo", label: "Activos" },
-  { value: "cedido", label: "Cedidos" },
+  { value: "paz_y_salvo_sin_escritura", label: "Paz y salvo sin escritura" },
   { value: "escriturado", label: "Escriturados" },
-  { value: "cancelado", label: "Cancelados" },
+  { value: "anulado", label: "Anulados" },
 ];
 
 export default async function ContratosPage({
@@ -187,7 +194,7 @@ export default async function ContratosPage({
                         ESTADO_STYLES[c.estado] ?? "bg-slate-100 text-slate-700"
                       }`}
                     >
-                      {c.estado}
+                      {ESTADO_LABELS[c.estado] ?? c.estado}
                     </span>
                   </td>
                   <td className="whitespace-nowrap px-4 py-2 text-right">

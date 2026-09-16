@@ -35,11 +35,11 @@ export default async function ReporteProyectoPage({
       .map((cp) => cp.contratos)
       .filter(Boolean);
 
-    // contrato vigente más reciente que no esté cancelado (si existe)
+    // contrato vigente más reciente que no esté anulado (si existe)
     const contratosOrdenados = [...contratosVinculados].sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
-    const contrato = contratosOrdenados.find((c) => c.estado !== "cancelado") ?? null;
+    const contrato = contratosOrdenados.find((c) => c.estado !== "anulado") ?? null;
     const resumen = contrato
       ? resumenCuotas(contrato.cuotas ?? [])
       : null;

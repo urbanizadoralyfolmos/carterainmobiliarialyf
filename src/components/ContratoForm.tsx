@@ -54,25 +54,38 @@ export function ContratoForm({
   }, [cantidadCuotas]);
 
   const totalCuotas = montos.reduce((acc, m) => acc + (Number(m) || 0), 0);
+  const clienteActual = clientes.find((c) => c.id === contrato?.cliente_id);
 
   return (
     <form action={action} className="mt-4 max-w-3xl">
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-slate-700">Cliente</label>
-          <select
-            name="cliente_id"
-            defaultValue={contrato?.cliente_id}
-            required
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-          >
-            <option value="">Seleccionar...</option>
-            {clientes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.apellido}, {c.nombre}
-              </option>
-            ))}
-          </select>
+          {esNuevo ? (
+            <select
+              name="cliente_id"
+              defaultValue={contrato?.cliente_id}
+              required
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            >
+              <option value="">Seleccionar...</option>
+              {clientes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.apellido}, {c.nombre}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <>
+              <p className="mt-1 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                {clienteActual ? `${clienteActual.apellido}, ${clienteActual.nombre}` : "-"}
+              </p>
+              <p className="mt-1 text-xs text-slate-400">
+                Para cambiar el titular de este contrato, usa &quot;Ceder contrato&quot; en el
+                estado de cuenta (queda registrado en el historial de cesiones).
+              </p>
+            </>
+          )}
         </div>
         <div className="col-span-2">
           <label className="block text-sm font-medium text-slate-700">
@@ -139,10 +152,17 @@ export function ContratoForm({
             className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
           >
             <option value="activo">Activo</option>
-            <option value="cedido">Cedido</option>
+            <option value="paz_y_salvo_sin_escritura">Paz y salvo sin escritura</option>
             <option value="escriturado">Escriturado</option>
-            <option value="cancelado">Cancelado</option>
+            <option value="anulado">Anulado</option>
           </select>
+          {contrato?.estado === "anulado" ? null : (
+            <p className="mt-1 text-xs text-slate-400">
+              &quot;Paz y salvo sin escritura&quot; se marca solo cuando se pagan todas las
+              cuotas. Al marcar &quot;Anulado&quot;, las propiedades/lotes de este contrato
+              vuelven a quedar disponibles para la venta.
+            </p>
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-700">Fecha de inicio</label>
@@ -302,7 +322,7 @@ export function ContratoForm({
       ) : (
         <p className="mt-6 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-700">
           El plan de cuotas ya generado no se modifica desde aquí. Para ajustar montos
-          de cuotas puntuales, hazlo desde la sección "Cuotas".
+          de cuotas puntuales, hazlo desde la sección &quot;Cuotas&quot;.
         </p>
       )}
 

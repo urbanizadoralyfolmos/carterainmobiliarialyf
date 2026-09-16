@@ -14,7 +14,7 @@ export async function registrarPago(id: string, formData: FormData) {
 
   const { data: cuotaActual } = await supabase
     .from("cuotas")
-    .select("monto_pagado")
+    .select("monto_pagado, contrato_id")
     .eq("id", id)
     .single();
 
@@ -33,8 +33,17 @@ export async function registrarPago(id: string, formData: FormData) {
     })
     .eq("id", id);
 
+  // Si con este pago quedaron todas las cuotas del contrato pagadas, lo pasa
+  // solo a "paz y salvo sin escritura" (sin tocar escriturado/anulado).
+  if (cuotaActual?.contrato_id) {
+    await supabase.rpc("sincronizar_estado_contrato_por_pagos", {
+      p_contrato_id: cuotaActual.contrato_id,
+    });
+  }
+
   revalidatePath("/cuotas");
   revalidatePath("/dashboard");
+  revalidatePath("/contratos");
 
   if (montoDelPago > 0) {
     const { data: recibo } = await supabase
@@ -55,13 +64,28 @@ export async function revertirPago(id: string) {
   await requireAdmin("/cuotas");
   const supabase = await createClient();
 
+  const { data: cuotaActual } = await supabase
+    .from("cuotas")
+    .select("contrato_id")
+    .eq("id", id)
+    .single();
+
   await supabase
     .from("cuotas")
     .update({ monto_pagado: 0, estado: "pendiente", fecha_pago: null, referencia: null })
     .eq("id", id);
 
+  // Si el contrato estaba "paz y salvo sin escritura" (todas pagadas), al
+  // revertir este pago ya no lo está: vuelve a "activo" automáticamente.
+  if (cuotaActual?.contrato_id) {
+    await supabase.rpc("sincronizar_estado_contrato_por_pagos", {
+      p_contrato_id: cuotaActual.contrato_id,
+    });
+  }
+
   revalidatePath("/cuotas");
   revalidatePath("/dashboard");
+  revalidatePath("/contratos");
 }
 
 /**
@@ -141,8 +165,13 @@ export async function agregarCuota(contratoId: string, formData: FormData) {
     redirect(`/contratos/${contratoId}/estado-cuenta?error=${encodeURIComponent(error.message)}`);
   }
 
+  // Agregar una cuota pendiente puede sacar al contrato de "paz y salvo sin
+  // escritura" (ya no están todas pagadas).
+  await supabase.rpc("sincronizar_estado_contrato_por_pagos", { p_contrato_id: contratoId });
+
   revalidatePath("/cuotas");
   revalidatePath(`/contratos/${contratoId}/estado-cuenta`);
+  revalidatePath("/contratos");
   revalidatePath("/dashboard");
   redirect(`/contratos/${contratoId}/estado-cuenta`);
 }
@@ -154,8 +183,12 @@ export async function eliminarCuota(id: string, contratoId: string) {
 
   await supabase.from("cuotas").delete().eq("id", id);
 
+  // Eliminar una cuota pendiente puede dejar todas las restantes pagadas.
+  await supabase.rpc("sincronizar_estado_contrato_por_pagos", { p_contrato_id: contratoId });
+
   revalidatePath("/cuotas");
   revalidatePath(`/contratos/${contratoId}/estado-cuenta`);
+  revalidatePath("/contratos");
   revalidatePath("/dashboard");
   redirect(`/contratos/${contratoId}/estado-cuenta`);
 }
