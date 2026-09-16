@@ -2,7 +2,11 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { esAdmin } from "@/lib/auth/rol";
 import { formatDate } from "@/lib/utils/format";
-import { actualizarRolUsuario } from "./actions";
+import { actualizarRolUsuario, crearUsuario } from "./actions";
+
+// Esta pantalla cambia apenas se crea o cambia de rol a alguien, así que
+// nunca debe quedar cacheada entre visitas.
+export const dynamic = "force-dynamic";
 
 const ROLES = [
   { value: "admin", label: "Administrador" },
@@ -21,9 +25,9 @@ type Usuario = {
 export default async function UsuariosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; guardado?: string; creado?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, guardado, creado } = await searchParams;
 
   // Esta pantalla es solo para administradores: cualquier otro usuario que
   // llegue a la URL directamente es redirigido al dashboard. La función
@@ -58,8 +62,81 @@ export default async function UsuariosPage({
           {error ?? errorConsulta?.message}
         </p>
       )}
+      {guardado && (
+        <p className="mt-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">
+          Rol actualizado correctamente.
+        </p>
+      )}
+      {creado && (
+        <p className="mt-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">
+          Usuario {creado} creado. Comparte con esa persona su email y la contraseña temporal
+          que definiste (no queda guardada en ningún lado, así que anótala ahora si no lo
+          hiciste).
+        </p>
+      )}
 
-      <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div className="mt-6 max-w-xl rounded-lg border border-slate-200 bg-white p-4">
+        <h2 className="text-sm font-semibold text-slate-900">+ Nuevo usuario</h2>
+        <p className="mt-1 text-xs text-slate-500">
+          Crea una cuenta nueva con una contraseña temporal. Compártesela a esa persona para
+          que inicie sesión (por ahora no hay una pantalla para que la cambie ella misma).
+        </p>
+        <form action={crearUsuario} className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label className="block text-xs font-medium text-slate-700">Nombre completo</label>
+            <input
+              name="nombre_completo"
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700">Email</label>
+            <input
+              type="email"
+              name="email"
+              required
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700">
+              Contraseña temporal
+            </label>
+            <input
+              type="text"
+              name="password"
+              required
+              minLength={6}
+              placeholder="Mínimo 6 caracteres"
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700">Rol</label>
+            <select
+              name="rol"
+              defaultValue="gestor"
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            >
+              {ROLES.map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="sm:col-span-2">
+            <button
+              type="submit"
+              className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark"
+            >
+              Crear usuario
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white">
         <table className="min-w-full divide-y divide-slate-200 text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
             <tr>
