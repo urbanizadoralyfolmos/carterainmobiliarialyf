@@ -1,7 +1,13 @@
 import type { ComponentProps, ReactElement } from "react";
 import { NextRequest, NextResponse } from "next/server";
 import { Document, Page, Text, View, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
-import { getReportes, REPORTE_TIPOS, type ReporteTipo, type ReporteMesFila } from "@/lib/reportes";
+import {
+  getReportes,
+  REPORTE_TIPOS,
+  type ReporteTipo,
+  type ReporteMesFila,
+  type ReporteAnioFila,
+} from "@/lib/reportes";
 import { formatMoney, formatDate } from "@/lib/utils/format";
 
 export const runtime = "nodejs";
@@ -105,6 +111,61 @@ function TablaRecaudo({
   );
 }
 
+function TablaRecaudoPorAnio({
+  titulo,
+  generado,
+  proyectos,
+  filasPorAnio,
+  totalesPorProyecto,
+  totalGeneral,
+}: {
+  titulo: string;
+  generado: string;
+  proyectos: string[];
+  filasPorAnio: ReporteAnioFila[];
+  totalesPorProyecto: Record<string, number>;
+  totalGeneral: number;
+}) {
+  return (
+    <Page size="A4" style={styles.page}>
+      <Text style={styles.title}>{titulo}</Text>
+      <Text style={styles.subtitle}>Generado el {generado}</Text>
+
+      <View style={styles.table}>
+        <View style={styles.tableHeaderRow}>
+          <Text style={[styles.th, styles.colMes]}>Año</Text>
+          {proyectos.map((p) => (
+            <Text key={p} style={[styles.th, styles.colProyecto]}>
+              {p}
+            </Text>
+          ))}
+          <Text style={[styles.th, styles.colTotal]}>Total</Text>
+        </View>
+        {filasPorAnio.map((fila) => (
+          <View style={styles.tableRow} key={fila.anio}>
+            <Text style={[styles.td, styles.colMes]}>{fila.anio}</Text>
+            {proyectos.map((p) => (
+              <Text key={p} style={[styles.td, styles.colProyecto]}>
+                {formatMoney(fila.porProyecto[p] ?? 0)}
+              </Text>
+            ))}
+            <Text style={[styles.td, styles.colTotal]}>{formatMoney(fila.total)}</Text>
+          </View>
+        ))}
+        <View style={styles.totalRow}>
+          <Text style={[styles.totalLabel, styles.colMes]}>Total</Text>
+          {proyectos.map((p) => (
+            <Text key={p} style={[styles.totalValue, styles.colProyecto]}>
+              {formatMoney(totalesPorProyecto[p] ?? 0)}
+            </Text>
+          ))}
+          <Text style={[styles.totalValue, styles.colTotal]}>{formatMoney(totalGeneral)}</Text>
+        </View>
+      </View>
+    </Page>
+  );
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ tipo: string }> }
@@ -151,6 +212,19 @@ export async function GET(
           filasPorMes={data.filasPorMesEsperado}
           totalesPorProyecto={data.totalesPorProyectoEsperado}
           totalGeneralAnio={data.totalGeneralAnioEsperado}
+        />
+      </Document>
+    );
+  } else if (reporteTipo === "recaudo-esperado-por-anio") {
+    doc = (
+      <Document>
+        <TablaRecaudoPorAnio
+          titulo="Recaudo esperado por año y proyecto"
+          generado={generado}
+          proyectos={data.proyectosEsperadoPorAnio}
+          filasPorAnio={data.filasPorAnioEsperado}
+          totalesPorProyecto={data.totalesPorProyectoEsperadoPorAnio}
+          totalGeneral={data.totalGeneralEsperadoPorAnio}
         />
       </Document>
     );
