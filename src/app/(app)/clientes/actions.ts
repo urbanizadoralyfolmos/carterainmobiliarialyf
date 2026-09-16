@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { normalizarTelefonoCO } from "@/lib/utils/telefono";
+import { requireAdmin } from "@/lib/auth/rol";
 
 function readClienteForm(formData: FormData) {
   const tipoPersona = String(formData.get("tipo_persona") ?? "natural") === "juridica"
@@ -47,6 +48,7 @@ export async function crearCliente(formData: FormData) {
 }
 
 export async function actualizarCliente(id: string, formData: FormData) {
+  await requireAdmin(`/clientes/${id}`);
   const supabase = await createClient();
   const data = readClienteForm(formData);
 
@@ -60,6 +62,7 @@ export async function actualizarCliente(id: string, formData: FormData) {
 }
 
 export async function eliminarCliente(id: string) {
+  await requireAdmin("/clientes");
   const supabase = await createClient();
   await supabase.from("clientes").delete().eq("id", id);
   revalidatePath("/clientes");

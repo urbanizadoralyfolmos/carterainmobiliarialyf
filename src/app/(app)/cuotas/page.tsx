@@ -4,6 +4,7 @@ import { formatMoney, formatDate } from "@/lib/utils/format";
 import { calcularMora } from "@/lib/utils/mora";
 import { registrarPago, revertirPago } from "./actions";
 import { SearchInput } from "@/components/SearchInput";
+import { esAdmin } from "@/lib/auth/rol";
 
 const FILTROS = [
   { value: "todas", label: "Todas" },
@@ -22,10 +23,11 @@ function nombreProyecto(rel: ProyectoRel) {
 export default async function CuotasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filtro?: string; q?: string }>;
+  searchParams: Promise<{ filtro?: string; q?: string; error?: string }>;
 }) {
-  const { filtro = "todas", q } = await searchParams;
+  const { filtro = "todas", q, error: errorParam } = await searchParams;
   const supabase = await createClient();
+  const admin = await esAdmin();
 
   const { data: cuotas, error } = await supabase
     .from("cuotas")
@@ -123,6 +125,9 @@ export default async function CuotasPage({
           {error.message}
         </p>
       )}
+      {errorParam && (
+        <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{errorParam}</p>
+      )}
 
       <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
         <table className="min-w-full divide-y divide-slate-200 text-sm">
@@ -201,7 +206,7 @@ export default async function CuotasPage({
                         >
                           Ver recibo(s)
                         </Link>
-                        {c.estado === "pagada" && (
+                        {c.estado === "pagada" && admin && (
                           <form action={revertirPago.bind(null, c.id)}>
                             <button
                               type="submit"

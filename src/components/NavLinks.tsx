@@ -14,12 +14,14 @@ const links = [
   { href: "/reportes", label: "Reportes" },
 ];
 
-export function NavLinks() {
+export function NavLinks({ rol }: { rol?: string | null }) {
   const pathname = usePathname();
+  const linksVisibles =
+    rol === "admin" ? [...links, { href: "/usuarios", label: "Usuarios" }] : links;
 
   return (
     <nav className="flex flex-wrap gap-1">
-      {links.map((link) => {
+      {linksVisibles.map((link) => {
         const activo =
           pathname === link.href || pathname?.startsWith(`${link.href}/`);
         return (

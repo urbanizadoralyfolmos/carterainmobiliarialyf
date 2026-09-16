@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatMoney, formatDate } from "@/lib/utils/format";
 import { eliminarContrato } from "./actions";
 import { SearchInput } from "@/components/SearchInput";
+import { esAdmin } from "@/lib/auth/rol";
 
 const ESTADO_STYLES: Record<string, string> = {
   activo: "bg-green-100 text-green-800",
@@ -22,10 +23,11 @@ const ESTADOS = [
 export default async function ContratosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; estado?: string }>;
+  searchParams: Promise<{ q?: string; estado?: string; error?: string }>;
 }) {
-  const { q, estado = "todos" } = await searchParams;
+  const { q, estado = "todos", error: errorParam } = await searchParams;
   const supabase = await createClient();
+  const admin = await esAdmin();
   const { data: contratos, error } = await supabase
     .from("contratos")
     .select(
@@ -86,12 +88,20 @@ export default async function ContratosPage({
     <div>
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-slate-900">Contratos</h1>
-        <Link
-          href="/contratos/nuevo"
-          className="rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-dark"
-        >
-          + Nuevo contrato
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/contratos/nueva-promesa"
+            className="rounded-md border border-brand px-3 py-1.5 text-sm font-medium text-brand hover:bg-brand-light"
+          >
+            Cargar desde promesa (PDF)
+          </Link>
+          <Link
+            href="/contratos/nuevo"
+            className="rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-dark"
+          >
+            + Nuevo contrato
+          </Link>
+        </div>
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -121,6 +131,9 @@ export default async function ContratosPage({
         <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
           {error.message}
         </p>
+      )}
+      {errorParam && (
+        <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{errorParam}</p>
       )}
 
       <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
@@ -184,20 +197,24 @@ export default async function ContratosPage({
                     >
                       Estado de cuenta
                     </Link>
-                    <Link
-                      href={`/contratos/${c.id}`}
-                      className="ml-3 text-slate-600 hover:text-slate-900 hover:underline"
-                    >
-                      Editar
-                    </Link>
-                    <form action={eliminarContrato.bind(null, c.id)} className="inline">
-                      <button
-                        type="submit"
-                        className="ml-3 text-red-600 hover:text-red-800 hover:underline"
-                      >
-                        Eliminar
-                      </button>
-                    </form>
+                    {admin && (
+                      <>
+                        <Link
+                          href={`/contratos/${c.id}`}
+                          className="ml-3 text-slate-600 hover:text-slate-900 hover:underline"
+                        >
+                          Editar
+                        </Link>
+                        <form action={eliminarContrato.bind(null, c.id)} className="inline">
+                          <button
+                            type="submit"
+                            className="ml-3 text-red-600 hover:text-red-800 hover:underline"
+                          >
+                            Eliminar
+                          </button>
+                        </form>
+                      </>
+                    )}
                   </td>
                 </tr>
               );

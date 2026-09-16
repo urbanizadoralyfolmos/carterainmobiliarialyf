@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatMoney } from "@/lib/utils/format";
+import { esAdmin } from "@/lib/auth/rol";
 
 export default async function ProyectosPage() {
   const supabase = await createClient();
+  const admin = await esAdmin();
   const [{ data: proyectos, error }, { data: propiedades }] = await Promise.all([
     supabase.from("proyectos").select("*").order("nombre"),
     supabase.from("propiedades").select("id, proyecto_id, estado"),
@@ -75,7 +77,7 @@ export default async function ProyectosPage() {
                       href={`/proyectos/${p.id}`}
                       className="ml-3 text-slate-600 hover:text-slate-900 hover:underline"
                     >
-                      Editar
+                      {admin ? "Editar" : "Ver"}
                     </Link>
                   </td>
                 </tr>

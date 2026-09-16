@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/auth/rol";
 
 export async function registrarPago(id: string, formData: FormData) {
   const supabase = await createClient();
@@ -51,6 +52,7 @@ export async function registrarPago(id: string, formData: FormData) {
 }
 
 export async function revertirPago(id: string) {
+  await requireAdmin("/cuotas");
   const supabase = await createClient();
 
   await supabase
@@ -68,6 +70,7 @@ export async function revertirPago(id: string) {
  * ni el estado; eso se maneja desde "Pagar"/"Revertir".
  */
 export async function actualizarCuota(id: string, contratoId: string, formData: FormData) {
+  await requireAdmin(`/cuotas/${id}/editar`);
   const supabase = await createClient();
 
   const fechaVencimiento = String(formData.get("fecha_vencimiento") ?? "");
@@ -146,6 +149,7 @@ export async function agregarCuota(contratoId: string, formData: FormData) {
 
 /** Elimina una cuota (por ejemplo, una que se cargó de más por error). */
 export async function eliminarCuota(id: string, contratoId: string) {
+  await requireAdmin(`/contratos/${contratoId}/estado-cuenta`);
   const supabase = await createClient();
 
   await supabase.from("cuotas").delete().eq("id", id);

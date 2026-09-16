@@ -2,14 +2,16 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { eliminarCliente } from "./actions";
 import { SearchInput } from "@/components/SearchInput";
+import { esAdmin } from "@/lib/auth/rol";
 
 export default async function ClientesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; error?: string }>;
 }) {
-  const { q } = await searchParams;
+  const { q, error: errorParam } = await searchParams;
   const supabase = await createClient();
+  const admin = await esAdmin();
   const { data: clientesData, error } = await supabase
     .from("clientes")
     .select("*")
@@ -57,6 +59,9 @@ export default async function ClientesPage({
           {error.message}
         </p>
       )}
+      {errorParam && (
+        <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{errorParam}</p>
+      )}
 
       <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white">
         <table className="min-w-full divide-y divide-slate-200 text-sm">
@@ -90,20 +95,26 @@ export default async function ClientesPage({
                   {c.email ?? "-"} {c.telefono ? `· ${c.telefono}` : ""}
                 </td>
                 <td className="px-4 py-2 text-right">
-                  <Link
-                    href={`/clientes/${c.id}`}
-                    className="text-slate-600 hover:text-slate-900 hover:underline"
-                  >
-                    Editar
-                  </Link>
-                  <form action={eliminarCliente.bind(null, c.id)} className="inline">
-                    <button
-                      type="submit"
-                      className="ml-3 text-red-600 hover:text-red-800 hover:underline"
-                    >
-                      Eliminar
-                    </button>
-                  </form>
+                  {admin ? (
+                    <>
+                      <Link
+                        href={`/clientes/${c.id}`}
+                        className="text-slate-600 hover:text-slate-900 hover:underline"
+                      >
+                        Editar
+                      </Link>
+                      <form action={eliminarCliente.bind(null, c.id)} className="inline">
+                        <button
+                          type="submit"
+                          className="ml-3 text-red-600 hover:text-red-800 hover:underline"
+                        >
+                          Eliminar
+                        </button>
+                      </form>
+                    </>
+                  ) : (
+                    <span className="text-xs text-slate-400">-</span>
+                  )}
                 </td>
               </tr>
             ))}

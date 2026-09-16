@@ -4,6 +4,7 @@ import { formatMoney, formatDate } from "@/lib/utils/format";
 import { PrintButton } from "@/components/PrintButton";
 import { getEstadoCuentaContrato } from "@/lib/estado-cuenta-contrato";
 import { agregarCuota, eliminarCuota } from "@/app/(app)/cuotas/actions";
+import { esAdmin } from "@/lib/auth/rol";
 
 const ESTADO_LABELS: Record<string, string> = {
   activo: "Activo",
@@ -27,6 +28,7 @@ export default async function EstadoCuentaContratoPage({
   const { id } = await params;
   const { error } = await searchParams;
   const data = await getEstadoCuentaContrato(id);
+  const admin = await esAdmin();
 
   if (!data) notFound();
 
@@ -41,14 +43,15 @@ export default async function EstadoCuentaContratoPage({
           ← Volver al contrato
         </Link>
         <div className="flex gap-2">
-          {DOWNLOAD_LINKS.map((link) => {
-            const href = `/api/contratos/${id}/estado-cuenta/${link.tipo}`;
-            return (
-              <a key={link.tipo} href={href} className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100">
-                {link.etiqueta}
-              </a>
-            );
-          })}
+          {DOWNLOAD_LINKS.map((link) => (
+            <a
+              key={link.tipo}
+              href={`/api/contratos/${id}/estado-cuenta/${link.tipo}`}
+              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
+            >
+              {link.etiqueta}
+            </a>
+          ))}
           <PrintButton />
         </div>
       </div>
@@ -246,22 +249,26 @@ export default async function EstadoCuentaContratoPage({
                   <td className="py-1 pr-3 text-slate-600">{c.numero_recibo ?? "-"}</td>
                   <td className="py-1 pr-3 text-slate-600">{c.estado}</td>
                   <td className="py-1 pr-3 text-right print:hidden">
-                    <div className="flex items-center justify-end gap-2 whitespace-nowrap">
-                      <Link
-                        href={`/cuotas/${c.id}/editar`}
-                        className="text-xs text-slate-500 hover:text-slate-800 hover:underline"
-                      >
-                        Editar
-                      </Link>
-                      <form action={eliminarCuota.bind(null, c.id, contrato.id)}>
-                        <button
-                          type="submit"
-                          className="text-xs text-red-600 hover:text-red-800 hover:underline"
+                    {admin ? (
+                      <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                        <Link
+                          href={`/cuotas/${c.id}/editar`}
+                          className="text-xs text-slate-500 hover:text-slate-800 hover:underline"
                         >
-                          Eliminar
-                        </button>
-                      </form>
-                    </div>
+                          Editar
+                        </Link>
+                        <form action={eliminarCuota.bind(null, c.id, contrato.id)}>
+                          <button
+                            type="submit"
+                            className="text-xs text-red-600 hover:text-red-800 hover:underline"
+                          >
+                            Eliminar
+                          </button>
+                        </form>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-slate-400">-</span>
+                    )}
                   </td>
                 </tr>
               ))}

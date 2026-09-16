@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/auth/rol";
 
 function readProyectoForm(formData: FormData) {
   return {
@@ -32,6 +33,7 @@ export async function crearProyecto(formData: FormData) {
 }
 
 export async function actualizarProyecto(id: string, formData: FormData) {
+  await requireAdmin(`/proyectos/${id}`);
   const supabase = await createClient();
   const data = readProyectoForm(formData);
 
@@ -46,6 +48,7 @@ export async function actualizarProyecto(id: string, formData: FormData) {
 }
 
 export async function eliminarProyecto(id: string) {
+  await requireAdmin(`/proyectos/${id}`);
   const supabase = await createClient();
 
   // Primero se borran los lotes/propiedades que se crearon dentro de este

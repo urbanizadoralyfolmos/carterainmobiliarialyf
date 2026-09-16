@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatMoney } from "@/lib/utils/format";
 import { actualizarCuota } from "../../actions";
+import { esAdmin } from "@/lib/auth/rol";
 
 export default async function EditarCuotaPage({
   params,
@@ -13,6 +14,17 @@ export default async function EditarCuotaPage({
 }) {
   const { id } = await params;
   const { error } = await searchParams;
+
+  // Editar cuotas (fecha/monto) es solo para administradores; registrar un
+  // pago se sigue haciendo desde /cuotas, que está abierto a todos.
+  if (!(await esAdmin())) {
+    redirect(
+      `/cuotas?error=${encodeURIComponent(
+        "No tienes permisos para editar cuotas. Consulta a un administrador."
+      )}`
+    );
+  }
+
   const supabase = await createClient();
 
   const { data: cuota } = await supabase

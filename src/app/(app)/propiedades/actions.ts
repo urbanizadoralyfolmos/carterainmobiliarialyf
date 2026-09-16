@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/auth/rol";
 
 function readPropiedadForm(formData: FormData) {
   const estado = String(formData.get("estado") ?? "disponible");
@@ -51,6 +52,7 @@ export async function crearPropiedad(formData: FormData) {
 }
 
 export async function actualizarPropiedad(id: string, formData: FormData) {
+  await requireAdmin(`/propiedades/${id}`);
   const supabase = await createClient();
   const data = readPropiedadForm(formData);
 
@@ -70,8 +72,9 @@ export async function actualizarPropiedad(id: string, formData: FormData) {
  * propiedades seguidas sin perder el filtro cada vez.
  */
 export async function eliminarPropiedad(id: string, formData: FormData) {
-  const supabase = await createClient();
   const redirectTo = String(formData.get("redirect_to") ?? "").trim() || "/propiedades";
+  await requireAdmin(redirectTo);
+  const supabase = await createClient();
 
   const { error } = await supabase.from("propiedades").delete().eq("id", id);
   if (error) {
@@ -95,9 +98,10 @@ export async function eliminarPropiedad(id: string, formData: FormData) {
  * deselecciones esa propiedad puntual e intentes de nuevo con el resto.
  */
 export async function eliminarPropiedades(formData: FormData) {
+  const redirectTo = String(formData.get("redirect_to") ?? "").trim() || "/propiedades";
+  await requireAdmin(redirectTo);
   const supabase = await createClient();
   const ids = formData.getAll("propiedad_ids").map(String).filter(Boolean);
-  const redirectTo = String(formData.get("redirect_to") ?? "").trim() || "/propiedades";
 
   if (ids.length === 0) {
     redirect(`${redirectTo}?error=${encodeURIComponent("No seleccionaste ninguna propiedad.")}`);
@@ -124,11 +128,12 @@ export async function eliminarPropiedades(formData: FormData) {
  * algo sale mal (por defecto, la lista de Propiedades).
  */
 export async function actualizarSuperficiePropiedad(id: string, formData: FormData) {
+  const redirectTo = String(formData.get("redirect_to") ?? "").trim() || "/propiedades";
+  await requireAdmin(redirectTo);
   const supabase = await createClient();
   const raw = formData.get("superficie_m2");
   const texto = String(raw ?? "").trim();
   const superficie_m2 = texto === "" ? null : Number(texto);
-  const redirectTo = String(formData.get("redirect_to") ?? "").trim() || "/propiedades";
 
   if (superficie_m2 !== null && (Number.isNaN(superficie_m2) || superficie_m2 < 0)) {
     redirect(

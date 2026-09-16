@@ -1,7 +1,13 @@
 import { LogoMark } from "./LogoMark";
 import { NavLinks } from "./NavLinks";
 
-export function Nav({ email }: { email?: string | null }) {
+export function Nav({
+  email,
+  rol,
+}: {
+  email?: string | null;
+  rol?: string | null;
+}) {
   return (
     <header className="border-t-2 border-b border-t-brand border-b-slate-200 bg-white print:hidden">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-y-2 px-4 py-3">
@@ -12,7 +18,7 @@ export function Nav({ email }: { email?: string | null }) {
               CARTERA URBANIZADORA LYF OLMOS
             </span>
           </span>
-          <NavLinks />
+          <NavLinks rol={rol} />
         </div>
         <div className="flex items-center gap-3">
           {email && <span className="text-sm text-slate-500">{email}</span>}

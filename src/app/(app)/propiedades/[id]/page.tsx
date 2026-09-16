@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PropiedadForm } from "@/components/PropiedadForm";
 import { actualizarPropiedad } from "../actions";
+import { esAdmin } from "@/lib/auth/rol";
 
 export default async function EditarPropiedadPage({
   params,
@@ -13,6 +14,16 @@ export default async function EditarPropiedadPage({
 }) {
   const { id } = await params;
   const { error } = await searchParams;
+
+  // Editar propiedades es solo para administradores.
+  if (!(await esAdmin())) {
+    redirect(
+      `/propiedades?error=${encodeURIComponent(
+        "No tienes permisos para editar propiedades. Consulta a un administrador."
+      )}`
+    );
+  }
+
   const supabase = await createClient();
 
   const { data: propiedad } = await supabase

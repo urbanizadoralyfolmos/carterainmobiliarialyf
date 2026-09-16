@@ -6,6 +6,7 @@ import { ProyectoForm } from "@/components/ProyectoForm";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { actualizarProyecto, eliminarProyecto, generarLotes } from "../actions";
 import { actualizarSuperficiePropiedad } from "@/app/(app)/propiedades/actions";
+import { esAdmin } from "@/lib/auth/rol";
 
 const ESTADO_LABELS: Record<string, string> = {
   disponible: "Disponible",
@@ -31,6 +32,7 @@ export default async function ProyectoDetallePage({
   const { id } = await params;
   const { error, manzana: manzanaFiltro } = await searchParams;
   const supabase = await createClient();
+  const admin = await esAdmin();
 
   const { data: proyecto } = await supabase
     .from("proyectos")
@@ -87,23 +89,44 @@ export default async function ProyectoDetallePage({
       <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-2">
         <div>
           <h2 className="text-sm font-semibold text-slate-900">Datos del proyecto</h2>
-          <ProyectoForm proyecto={proyecto} action={actualizarConId} error={error} />
+          {admin ? (
+            <>
+              <ProyectoForm proyecto={proyecto} action={actualizarConId} error={error} />
 
-          <form action={eliminarConId} className="mt-4 max-w-2xl border-t border-slate-200 pt-4">
-            <p className="text-xs text-slate-500">
-              Eliminar este proyecto también elimina sus {lotes?.length ?? 0} lote(s)/propiedad(es).
-              Si alguno ya tiene un contrato asociado, no se podrá eliminar el proyecto hasta que
-              elimines o reasignes ese contrato primero. Esta acción no se puede deshacer.
-            </p>
-            <ConfirmSubmitButton
-              mensaje={`¿Eliminar el proyecto "${proyecto.nombre}" junto con sus ${
-                lotes?.length ?? 0
-              } lote(s)/propiedad(es)? Esta acción no se puede deshacer.`}
-              className="mt-2 text-sm text-red-600 hover:text-red-800 hover:underline"
-            >
-              Eliminar proyecto
-            </ConfirmSubmitButton>
-          </form>
+              <form
+                action={eliminarConId}
+                className="mt-4 max-w-2xl border-t border-slate-200 pt-4"
+              >
+                <p className="text-xs text-slate-500">
+                  Eliminar este proyecto también elimina sus {lotes?.length ?? 0}{" "}
+                  lote(s)/propiedad(es). Si alguno ya tiene un contrato asociado, no se podrá
+                  eliminar el proyecto hasta que elimines o reasignes ese contrato primero. Esta
+                  acción no se puede deshacer.
+                </p>
+                <ConfirmSubmitButton
+                  mensaje={`¿Eliminar el proyecto "${proyecto.nombre}" junto con sus ${
+                    lotes?.length ?? 0
+                  } lote(s)/propiedad(es)? Esta acción no se puede deshacer.`}
+                  className="mt-2 text-sm text-red-600 hover:text-red-800 hover:underline"
+                >
+                  Eliminar proyecto
+                </ConfirmSubmitButton>
+              </form>
+            </>
+          ) : (
+            <div className="mt-2 max-w-2xl rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              <p className="font-medium text-slate-900">{proyecto.nombre}</p>
+              <p className="mt-1 text-slate-500">
+                {proyecto.ciudad ?? "-"}
+                {proyecto.valor_m2 ? ` · Valor m²: ${formatMoney(proyecto.valor_m2)}` : ""}
+              </p>
+              {proyecto.descripcion && <p className="mt-2">{proyecto.descripcion}</p>}
+              <p className="mt-3 text-xs text-slate-400">
+                No tienes permisos para editar o eliminar este proyecto. Consulta a un
+                administrador.
+              </p>
+            </div>
+          )}
         </div>
 
         <div>
@@ -274,23 +297,27 @@ export default async function ProyectoDetallePage({
                   <td className="px-4 py-2 font-medium text-slate-900">{l.direccion}</td>
                   <td className="px-4 py-2 text-slate-600">{l.manzana ?? "-"}</td>
                   <td className="px-4 py-2 text-slate-600">
-                    <form
-                      action={actualizarSuperficiePropiedad.bind(null, l.id)}
-                      className="flex items-center gap-1"
-                    >
-                      <input type="hidden" name="redirect_to" value={redirectToLotes} />
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        name="superficie_m2"
-                        defaultValue={l.superficie_m2 ?? ""}
-                        className="w-20 rounded-md border border-slate-300 px-1.5 py-1 text-sm"
-                      />
-                      <button type="submit" className="text-xs text-brand hover:underline">
-                        Guardar
-                      </button>
-                    </form>
+                    {admin ? (
+                      <form
+                        action={actualizarSuperficiePropiedad.bind(null, l.id)}
+                        className="flex items-center gap-1"
+                      >
+                        <input type="hidden" name="redirect_to" value={redirectToLotes} />
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          name="superficie_m2"
+                          defaultValue={l.superficie_m2 ?? ""}
+                          className="w-20 rounded-md border border-slate-300 px-1.5 py-1 text-sm"
+                        />
+                        <button type="submit" className="text-xs text-brand hover:underline">
+                          Guardar
+                        </button>
+                      </form>
+                    ) : (
+                      <span>{l.superficie_m2 ? l.superficie_m2 : "-"}</span>
+                    )}
                   </td>
                   <td className="px-4 py-2 text-slate-600">
                     {l.valor_referencia ? formatMoney(l.valor_referencia) : "-"}
@@ -305,12 +332,16 @@ export default async function ProyectoDetallePage({
                     </span>
                   </td>
                   <td className="px-4 py-2 text-right">
-                    <Link
-                      href={`/propiedades/${l.id}`}
-                      className="text-slate-600 hover:text-slate-900 hover:underline"
-                    >
-                      Editar
-                    </Link>
+                    {admin ? (
+                      <Link
+                        href={`/propiedades/${l.id}`}
+                        className="text-slate-600 hover:text-slate-900 hover:underline"
+                      >
+                        Editar
+                      </Link>
+                    ) : (
+                      <span className="text-xs text-slate-400">-</span>
+                    )}
                   </td>
                 </tr>
               ))}

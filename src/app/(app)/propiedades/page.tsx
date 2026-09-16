@@ -5,6 +5,7 @@ import { eliminarPropiedad, eliminarPropiedades } from "./actions";
 import { SearchInput } from "@/components/SearchInput";
 import { SeleccionarTodasCheckbox } from "@/components/SeleccionarTodasCheckbox";
 import { EliminarSeleccionadasButton } from "@/components/EliminarSeleccionadasButton";
+import { esAdmin } from "@/lib/auth/rol";
 
 const ESTADO_LABELS: Record<string, string> = {
   disponible: "Disponible",
@@ -27,6 +28,7 @@ export default async function PropiedadesPage({
 }) {
   const { proyecto: proyectoFiltro, estado: estadoFiltro, q, error: errorParam } = await searchParams;
   const supabase = await createClient();
+  const admin = await esAdmin();
 
   let query = supabase
     .from("propiedades")
@@ -176,22 +178,26 @@ export default async function PropiedadesPage({
       <form action={eliminarPropiedades}>
         <input type="hidden" name="redirect_to" value={currentHref} />
 
-        <div className="mt-4 flex items-center justify-between">
-          <p className="text-xs text-slate-500">
-            Marca las propiedades que quieras eliminar y usa el botón de abajo para borrarlas
-            todas de una vez.
-          </p>
-          <EliminarSeleccionadasButton className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50" />
-        </div>
+        {admin && (
+          <div className="mt-4 flex items-center justify-between">
+            <p className="text-xs text-slate-500">
+              Marca las propiedades que quieras eliminar y usa el botón de abajo para borrarlas
+              todas de una vez.
+            </p>
+            <EliminarSeleccionadasButton className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50" />
+          </div>
+        )}
 
         <div className="mt-2 overflow-hidden rounded-lg border border-slate-200 bg-white">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200 text-sm">
               <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
                 <tr>
-                  <th className="px-4 py-2">
-                    <SeleccionarTodasCheckbox />
-                  </th>
+                  {admin && (
+                    <th className="px-4 py-2">
+                      <SeleccionarTodasCheckbox />
+                    </th>
+                  )}
                   <th className="px-4 py-2">Dirección</th>
                   <th className="px-4 py-2">Proyecto</th>
                   <th className="px-4 py-2">Tipo</th>
@@ -208,14 +214,16 @@ export default async function PropiedadesPage({
                   const contrato = contratoPorPropiedad.get(p.id);
                   return (
                     <tr key={p.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-2">
-                        <input
-                          type="checkbox"
-                          name="propiedad_ids"
-                          value={p.id}
-                          className="h-4 w-4 rounded border-slate-300"
-                        />
-                      </td>
+                      {admin && (
+                        <td className="px-4 py-2">
+                          <input
+                            type="checkbox"
+                            name="propiedad_ids"
+                            value={p.id}
+                            className="h-4 w-4 rounded border-slate-300"
+                          />
+                        </td>
+                      )}
                       <td className="px-4 py-2 font-medium text-slate-900">
                         <Link href={`/propiedades/${p.id}`} className="hover:underline">
                           {p.direccion}
@@ -263,26 +271,32 @@ export default async function PropiedadesPage({
                         {p.estado === "disponible" && "-"}
                       </td>
                       <td className="px-4 py-2 text-right">
-                        <Link
-                          href={`/propiedades/${p.id}`}
-                          className="text-slate-600 hover:text-slate-900 hover:underline"
-                        >
-                          Editar
-                        </Link>
-                        <button
-                          type="submit"
-                          formAction={eliminarPropiedad.bind(null, p.id)}
-                          className="ml-3 text-red-600 hover:text-red-800 hover:underline"
-                        >
-                          Eliminar
-                        </button>
+                        {admin ? (
+                          <>
+                            <Link
+                              href={`/propiedades/${p.id}`}
+                              className="text-slate-600 hover:text-slate-900 hover:underline"
+                            >
+                              Editar
+                            </Link>
+                            <button
+                              type="submit"
+                              formAction={eliminarPropiedad.bind(null, p.id)}
+                              className="ml-3 text-red-600 hover:text-red-800 hover:underline"
+                            >
+                              Eliminar
+                            </button>
+                          </>
+                        ) : (
+                          <span className="text-xs text-slate-400">-</span>
+                        )}
                       </td>
                     </tr>
                   );
                 })}
                 {propiedades?.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="px-4 py-6 text-center text-slate-400">
+                    <td colSpan={admin ? 10 : 9} className="px-4 py-6 text-center text-slate-400">
                       Todavía no hay propiedades cargadas.
                     </td>
                   </tr>

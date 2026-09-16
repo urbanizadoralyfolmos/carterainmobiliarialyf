@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ContratoForm } from "@/components/ContratoForm";
 import { actualizarContrato } from "../actions";
+import { esAdmin } from "@/lib/auth/rol";
 
 export default async function EditarContratoPage({
   params,
@@ -13,6 +14,16 @@ export default async function EditarContratoPage({
 }) {
   const { id } = await params;
   const { error } = await searchParams;
+
+  // Editar contratos es solo para administradores.
+  if (!(await esAdmin())) {
+    redirect(
+      `/contratos?error=${encodeURIComponent(
+        "No tienes permisos para editar contratos. Consulta a un administrador."
+      )}`
+    );
+  }
+
   const supabase = await createClient();
 
   const [{ data: contrato }, { data: clientes }, { data: propiedades }, { data: vinculos }] =

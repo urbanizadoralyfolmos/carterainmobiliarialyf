@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { generarFechasCuotas } from "@/lib/utils/mora";
 import { normalizarTelefonoCO } from "@/lib/utils/telefono";
+import { requireAdmin } from "@/lib/auth/rol";
 
 function readContratoForm(formData: FormData) {
   return {
@@ -105,12 +106,12 @@ export async function crearContrato(formData: FormData) {
 
   // Las propiedades pasan a "prometido en venta" al quedar ligadas a un
   // contrato (solo si todavía estaban disponibles; no se pisa un estado
-  // más avanzado como escriturado/facturado).
-  await supabase
-    .from("propiedades")
-    .update({ estado: "prometido_en_venta" })
-    .in("id", propiedadIds)
-    .eq("estado", "disponible");
+  // más avanzado como escriturado/facturado). Se usa una función RPC en vez
+  // de un update directo porque "propiedades" solo admite UPDATE directo
+  // desde admin; esta función puntual sí puede llamarla cualquier usuario
+  // autenticado, ya que es un efecto colateral de crear el contrato (una
+  // acción de alta, no una edición manual).
+  await supabase.rpc("marcar_propiedades_prometidas", { ids: propiedadIds });
 
   revalidatePath("/contratos");
   revalidatePath("/cuotas");
@@ -119,6 +120,7 @@ export async function crearContrato(formData: FormData) {
 }
 
 export async function actualizarContrato(id: string, formData: FormData) {
+  await requireAdmin(`/contratos/${id}`);
   const supabase = await createClient();
   const data = readContratoForm(formData);
   const propiedadIds = readPropiedadIds(formData);
@@ -174,6 +176,7 @@ export async function actualizarContrato(id: string, formData: FormData) {
 }
 
 export async function eliminarContrato(id: string) {
+  await requireAdmin("/contratos");
   const supabase = await createClient();
   await supabase.from("contratos").delete().eq("id", id);
   revalidatePath("/contratos");
@@ -343,11 +346,7 @@ export async function crearContratoDesdePromesa(formData: FormData) {
     redirect(`/contratos/nueva-promesa?error=${encodeURIComponent(errorCuotas.message)}`);
   }
 
-  await supabase
-    .from("propiedades")
-    .update({ estado: "prometido_en_venta" })
-    .in("id", propiedadIds)
-    .eq("estado", "disponible");
+  await supabase.rpc("marcar_propiedades_prometidas", { ids: propiedadIds });
 
   revalidatePath("/contratos");
   revalidatePath("/cuotas");

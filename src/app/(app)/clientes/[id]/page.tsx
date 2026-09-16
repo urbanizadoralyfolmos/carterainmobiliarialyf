@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ClienteForm } from "@/components/ClienteForm";
 import { actualizarCliente } from "../actions";
+import { esAdmin } from "@/lib/auth/rol";
 
 export default async function EditarClientePage({
   params,
@@ -13,6 +14,17 @@ export default async function EditarClientePage({
 }) {
   const { id } = await params;
   const { error } = await searchParams;
+
+  // Editar clientes es solo para administradores; el resto puede ver el
+  // estado de cuenta pero no esta pantalla.
+  if (!(await esAdmin())) {
+    redirect(
+      `/clientes?error=${encodeURIComponent(
+        "No tienes permisos para editar clientes. Consulta a un administrador."
+      )}`
+    );
+  }
+
   const supabase = await createClient();
 
   const { data: cliente } = await supabase
