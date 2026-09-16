@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
-import { getReportes, REPORTE_TIPOS, type ReporteTipo, type ReporteMesFila } from "@/lib/reportes";
+import {
+  getReportes,
+  REPORTE_TIPOS,
+  type ReporteTipo,
+  type ReporteMesFila,
+  type ReporteAnioFila,
+} from "@/lib/reportes";
 import { formatDate } from "@/lib/utils/format";
 
 export const runtime = "nodejs";
@@ -56,6 +62,50 @@ function agregarHojaRecaudo(
   totalGeneralCell.font = { bold: true };
 }
 
+function agregarHojaRecaudoPorAnio(
+  workbook: ExcelJS.Workbook,
+  nombreHoja: string,
+  proyectos: string[],
+  filasPorAnio: ReporteAnioFila[],
+  totalesPorProyecto: Record<string, number>,
+  totalGeneral: number
+) {
+  const sheet = workbook.addWorksheet(nombreHoja);
+  const header = ["Año", ...proyectos, "Total"];
+  sheet.columns = header.map((_, i) => ({ width: i === 0 ? 12 : 16 }));
+
+  const headerRow = sheet.getRow(1);
+  header.forEach((h, i) => headerCell(headerRow.getCell(i + 1), h));
+
+  filasPorAnio.forEach((fila, idx) => {
+    const row = sheet.getRow(idx + 2);
+    row.getCell(1).value = fila.anio;
+    proyectos.forEach((p, i) => {
+      const cell = row.getCell(i + 2);
+      cell.value = fila.porProyecto[p] ?? 0;
+      cell.numFmt = "#,##0";
+    });
+    const totalCell = row.getCell(proyectos.length + 2);
+    totalCell.value = fila.total;
+    totalCell.numFmt = "#,##0";
+    totalCell.font = { bold: true };
+  });
+
+  const totalRow = sheet.getRow(filasPorAnio.length + 2);
+  totalRow.getCell(1).value = "Total";
+  totalRow.getCell(1).font = { bold: true };
+  proyectos.forEach((p, i) => {
+    const cell = totalRow.getCell(i + 2);
+    cell.value = totalesPorProyecto[p] ?? 0;
+    cell.numFmt = "#,##0";
+    cell.font = { bold: true };
+  });
+  const totalGeneralCell = totalRow.getCell(proyectos.length + 2);
+  totalGeneralCell.value = totalGeneral;
+  totalGeneralCell.numFmt = "#,##0";
+  totalGeneralCell.font = { bold: true };
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ tipo: string }> }
@@ -97,6 +147,15 @@ export async function GET(
       data.totalesPorProyectoEsperado,
       data.totalGeneralAnioEsperado,
       anio
+    );
+  } else if (reporteTipo === "recaudo-esperado-por-anio") {
+    agregarHojaRecaudoPorAnio(
+      workbook,
+      "Recaudo esperado por año",
+      data.proyectosEsperadoPorAnio,
+      data.filasPorAnioEsperado,
+      data.totalesPorProyectoEsperadoPorAnio,
+      data.totalGeneralEsperadoPorAnio
     );
   } else if (reporteTipo === "vencen-este-mes") {
     const sheet = workbook.addWorksheet("Vencen este mes");
