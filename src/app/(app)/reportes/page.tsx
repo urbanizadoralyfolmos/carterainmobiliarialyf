@@ -179,6 +179,81 @@ export default async function ReportesPage({
         </div>
       </div>
 
+      {/* 2b. Recaudo esperado por año y proyecto (todos los años, no solo el seleccionado arriba) */}
+      <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-slate-900">
+            Dinero recaudado esperado por año y proyecto
+          </h2>
+          <DescargarReporte tipo="recaudo-esperado-por-anio" anio={anio} />
+        </div>
+        <p className="mt-1 text-xs text-slate-400">
+          Igual que el reporte anterior pero sumado por año completo: incluye todos los años que
+          tengan cuotas programadas, sin importar el año seleccionado arriba.
+        </p>
+
+        <div className="mt-3 overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <thead className="text-left text-xs uppercase text-slate-500">
+              <tr>
+                <th className="whitespace-nowrap py-1 pr-3">Año</th>
+                {data.proyectosEsperadoPorAnio.map((p) => (
+                  <th key={p} className="whitespace-nowrap py-1 pr-3 text-right">
+                    {p}
+                  </th>
+                ))}
+                <th className="whitespace-nowrap py-1 pr-3 text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {data.filasPorAnioEsperado.map((fila) => (
+                <tr key={fila.anio}>
+                  <td className="whitespace-nowrap py-1 pr-3 text-slate-700">{fila.anio}</td>
+                  {data.proyectosEsperadoPorAnio.map((p) => (
+                    <td key={p} className="whitespace-nowrap py-1 pr-3 text-right text-slate-600">
+                      {formatMoney(fila.porProyecto[p] ?? 0)}
+                    </td>
+                  ))}
+                  <td className="whitespace-nowrap py-1 pr-3 text-right font-medium text-slate-900">
+                    {formatMoney(fila.total)}
+                  </td>
+                </tr>
+              ))}
+              {data.filasPorAnioEsperado.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={data.proyectosEsperadoPorAnio.length + 2}
+                    className="py-4 text-center text-slate-400"
+                  >
+                    Todavía no hay cuotas programadas.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+            {data.filasPorAnioEsperado.length > 0 && (
+              <tfoot>
+                <tr className="border-t border-slate-200">
+                  <td className="whitespace-nowrap py-1 pr-3 font-semibold text-slate-900">
+                    Total
+                  </td>
+                  {data.proyectosEsperadoPorAnio.map((p) => (
+                    <td
+                      key={p}
+                      className="whitespace-nowrap py-1 pr-3 text-right font-semibold text-slate-900"
+                    >
+                      {formatMoney(data.totalesPorProyectoEsperadoPorAnio[p] ?? 0)}
+                    </td>
+                  ))}
+                  <td className="whitespace-nowrap py-1 pr-3 text-right font-semibold text-amber-800">
+                    {formatMoney(data.totalGeneralEsperadoPorAnio)}
+                  </td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+      </div>
+
       {/* 3. Cuotas que vencen este mes */}
       <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
