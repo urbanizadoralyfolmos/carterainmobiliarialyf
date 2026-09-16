@@ -39,6 +39,18 @@ export async function crearContrato(formData: FormData) {
       `/contratos/nuevo?error=${encodeURIComponent("Selecciona al menos una propiedad/lote.")}`
     );
   }
+  if (!data.fecha_fin) {
+    redirect(
+      `/contratos/nuevo?error=${encodeURIComponent(
+        "La fecha de finalización del contrato es obligatoria."
+      )}`
+    );
+  }
+  if (data.monto_total === null || Number.isNaN(data.monto_total)) {
+    redirect(
+      `/contratos/nuevo?error=${encodeURIComponent("El valor total del contrato es obligatorio.")}`
+    );
+  }
 
   const { data: contrato, error } = await supabase
     .from("contratos")
@@ -78,16 +90,10 @@ export async function crearContrato(formData: FormData) {
     });
   }
 
-  // Cuotas diferidas: cada una con el monto que se cargó en el formulario.
-  const offsetMeses = data.cuota_inicial > 0 ? 1 : 0;
-  const fechas = generarFechasCuotas(
-    data.fecha_inicio,
-    data.cantidad_cuotas,
-    data.dia_vencimiento,
-    offsetMeses
-  );
-
-  fechas.forEach((fecha, i) => {
+  // Cuotas diferidas: cada una con la fecha y el monto que se cargaron (y
+  // pudieron ajustarse manualmente) en el formulario, cuota por cuota.
+  for (let i = 0; i < data.cantidad_cuotas; i++) {
+    const fecha = String(formData.get(`fecha_cuota_${i + 1}`) ?? "");
     const monto = Number(formData.get(`monto_cuota_${i + 1}`) ?? 0);
     cuotas.push({
       contrato_id: contrato.id,
@@ -97,7 +103,7 @@ export async function crearContrato(formData: FormData) {
       monto_pagado: 0,
       estado: "pendiente",
     });
-  });
+  }
 
   const { error: errorCuotas } = await supabase.from("cuotas").insert(cuotas);
   if (errorCuotas) {
@@ -129,6 +135,18 @@ export async function actualizarContrato(id: string, formData: FormData) {
   if (propiedadIds.length === 0) {
     redirect(
       `/contratos/${id}?error=${encodeURIComponent("Selecciona al menos una propiedad/lote.")}`
+    );
+  }
+  if (!data.fecha_fin) {
+    redirect(
+      `/contratos/${id}?error=${encodeURIComponent(
+        "La fecha de finalización del contrato es obligatoria."
+      )}`
+    );
+  }
+  if (data.monto_total === null || Number.isNaN(data.monto_total)) {
+    redirect(
+      `/contratos/${id}?error=${encodeURIComponent("El valor total del contrato es obligatorio.")}`
     );
   }
 

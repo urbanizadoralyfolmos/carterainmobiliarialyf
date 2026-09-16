@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { Cliente, Contrato, Propiedad } from "@/lib/types";
 import { fechaCuota } from "@/lib/utils/plan";
-import { formatMoney, formatDate } from "@/lib/utils/format";
+import { formatMoney } from "@/lib/utils/format";
 
 export function ContratoForm({
   contrato,
@@ -26,12 +26,17 @@ export function ContratoForm({
   esNuevo: boolean;
 }) {
   const [fechaInicio, setFechaInicio] = useState(contrato?.fecha_inicio ?? "");
-  const [diaVencimiento, setDiaVencimiento] = useState(contrato?.dia_vencimiento ?? 10);
   const [moneda, setMoneda] = useState(contrato?.moneda ?? "COP");
   const [cantidadCuotas, setCantidadCuotas] = useState(contrato?.cantidad_cuotas ?? 12);
   const [montos, setMontos] = useState<number[]>(
     Array.from({ length: contrato?.cantidad_cuotas ?? 12 }, () => 0)
   );
+  // Fechas de cada cuota del plan generado: por defecto se calculan a
+  // partir de la fecha de inicio (mismo día del mes, mensual), pero quedan
+  // editables una por una. Solo se guarda aquí la fecha de las cuotas que
+  // el usuario tocó manualmente; las que no se tocaron siguen calculándose
+  // en vivo a partir de la fecha de inicio actual.
+  const [fechasEditadas, setFechasEditadas] = useState<Record<number, string>>({});
   const [seleccionadas, setSeleccionadas] = useState<Set<string>>(
     new Set(propiedadIdsSeleccionadas)
   );
@@ -54,6 +59,19 @@ export function ContratoForm({
       return next;
     });
   }, [cantidadCuotas]);
+
+  // Ya no hay un campo de "día de vencimiento" separado: el día por defecto
+  // para las cuotas generadas es simplemente el mismo día del mes de la
+  // fecha de inicio del contrato.
+  const diaVencimientoDefecto = fechaInicio ? Number(fechaInicio.slice(8, 10)) || 1 : 1;
+
+  function fechaCuotaPorDefecto(i: number) {
+    return fechaCuota(fechaInicio, i + 1, diaVencimientoDefecto);
+  }
+
+  function actualizarFechaCuota(i: number, valor: string) {
+    setFechasEditadas((prev) => ({ ...prev, [i]: valor }));
+  }
 
   const totalCuotas = montos.reduce((acc, m) => acc + (Number(m) || 0), 0);
   const clienteActual = clientes.find((c) => c.id === contrato?.cliente_id);
@@ -229,11 +247,12 @@ export function ContratoForm({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700">Fecha de fin (opcional)</label>
+          <label className="block text-sm font-medium text-slate-700">Fecha de fin</label>
           <input
             type="date"
             name="fecha_fin"
             defaultValue={contrato?.fecha_fin ?? ""}
+            required
             className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
         </div>
@@ -251,13 +270,14 @@ export function ContratoForm({
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-700">
-            Valor total del contrato (opcional)
+            Valor total del contrato
           </label>
           <input
             type="number"
             step="0.01"
             name="monto_total"
             defaultValue={contrato?.monto_total ?? ""}
+            required
             className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
         </div>
@@ -288,32 +308,16 @@ export function ContratoForm({
             className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
           />
         </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700">Día de vencimiento</label>
-          <input
-            type="number"
-            min={1}
-            max={28}
-            name="dia_vencimiento"
-            value={diaVencimiento}
-            onChange={(e) => setDiaVencimiento(Number(e.target.value) || 1)}
-            required
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700">
-            Tasa de mora mensual (%)
-          </label>
-          <input
-            type="number"
-            step="0.01"
-            name="tasa_mora_mensual"
-            defaultValue={contrato?.tasa_mora_mensual ?? 5}
-            required
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-          />
-        </div>
+        <input
+          type="hidden"
+          name="dia_vencimiento"
+          value={esNuevo ? diaVencimientoDefecto : contrato?.dia_vencimiento ?? 10}
+        />
+        <input
+          type="hidden"
+          name="tasa_mora_mensual"
+          value={contrato?.tasa_mora_mensual ?? 5}
+        />
         <div className="col-span-2">
           <label className="block text-sm font-medium text-slate-700">Notas</label>
           <textarea
@@ -343,8 +347,15 @@ export function ContratoForm({
                 {Array.from({ length: cantidadCuotas }).map((_, i) => (
                   <tr key={i}>
                     <td className="px-4 py-2 text-slate-600">#{i + 1}</td>
-                    <td className="px-4 py-2 text-slate-600">
-                      {fechaInicio ? formatDate(fechaCuota(fechaInicio, i + 1, diaVencimiento)) : "-"}
+                    <td className="px-4 py-2">
+                      <input
+                        type="date"
+                        name={`fecha_cuota_${i + 1}`}
+                        value={fechasEditadas[i] ?? fechaCuotaPorDefecto(i)}
+                        onChange={(e) => actualizarFechaCuota(i, e.target.value)}
+                        required
+                        className="rounded-md border border-slate-300 px-2 py-1 text-sm"
+                      />
                     </td>
                     <td className="px-4 py-2">
                       <input
