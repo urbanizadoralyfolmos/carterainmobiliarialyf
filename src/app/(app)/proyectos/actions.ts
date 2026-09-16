@@ -47,8 +47,33 @@ export async function actualizarProyecto(id: string, formData: FormData) {
 
 export async function eliminarProyecto(id: string) {
   const supabase = await createClient();
-  await supabase.from("proyectos").delete().eq("id", id);
+
+  // Primero se borran los lotes/propiedades que se crearon dentro de este
+  // proyecto. Si alguno ya tiene un contrato asociado, la base de datos
+  // bloquea ese borrado (no se permite borrar una propiedad con contratos
+  // vigentes): en ese caso se cancela todo antes de tocar el proyecto, para
+  // no dejarlo a medias (proyecto borrado pero con lotes sueltos, o
+  // viceversa).
+  const { error: errorPropiedades } = await supabase
+    .from("propiedades")
+    .delete()
+    .eq("proyecto_id", id);
+
+  if (errorPropiedades) {
+    redirect(
+      `/proyectos/${id}?error=${encodeURIComponent(
+        "No se pudo eliminar el proyecto: tiene lotes con contratos asociados. Elimina o reasigna esos contratos antes de borrar el proyecto."
+      )}`
+    );
+  }
+
+  const { error } = await supabase.from("proyectos").delete().eq("id", id);
+  if (error) {
+    redirect(`/proyectos/${id}?error=${encodeURIComponent(error.message)}`);
+  }
+
   revalidatePath("/proyectos");
+  revalidatePath("/propiedades");
   redirect("/proyectos");
 }
 
