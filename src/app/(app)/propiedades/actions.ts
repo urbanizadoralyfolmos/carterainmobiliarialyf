@@ -63,11 +63,19 @@ export async function actualizarPropiedad(id: string, formData: FormData) {
   redirect("/propiedades");
 }
 
-export async function eliminarPropiedad(id: string) {
+/**
+ * `redirect_to` permite volver al mismo listado/filtro de Propiedades desde
+ * donde se eliminó (por ejemplo "Sin proyecto" o un proyecto puntual), en
+ * vez de siempre volver al listado completo. Así se pueden eliminar varias
+ * propiedades seguidas sin perder el filtro cada vez.
+ */
+export async function eliminarPropiedad(id: string, formData: FormData) {
   const supabase = await createClient();
+  const redirectTo = String(formData.get("redirect_to") ?? "").trim() || "/propiedades";
+
   await supabase.from("propiedades").delete().eq("id", id);
   revalidatePath("/propiedades");
-  redirect("/propiedades");
+  redirect(redirectTo);
 }
 
 /**
