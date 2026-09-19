@@ -321,7 +321,9 @@ export async function getReportes(anio: number): Promise<ReportesData> {
       .select(
         "id, direccion, manzana, numero_lote, numero_escritura, fecha_escritura, proyectos(nombre)"
       )
-      .eq("estado", "escriturado")
+      // Un lote sigue "escriturado" (tiene número/fecha de escritura) aunque
+      // luego se facture: por eso este reporte incluye ambos estados.
+      .in("estado", ["escriturado", "facturado"])
       .order("direccion"),
   ]);
 

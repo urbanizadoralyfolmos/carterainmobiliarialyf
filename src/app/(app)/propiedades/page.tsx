@@ -50,16 +50,24 @@ export default async function PropiedadesPage({
       query,
       supabase
         .from("contrato_propiedades")
-        .select("propiedad_id, contratos(numero, estado, created_at)")
+        .select("propiedad_id, contratos(numero, estado, numero_factura, created_at)")
         .order("created_at", { ascending: false }),
       supabase.from("proyectos").select("id, nombre, valor_m2").order("nombre"),
     ]);
 
-  // Contrato más reciente por propiedad (para mostrar el vínculo). Una
-  // propiedad puede, en teoría, pasar por más de un contrato en el tiempo.
-  const contratoPorPropiedad = new Map<string, { numero: number; estado: string }>();
+  type ContratoRelPropiedad = {
+    numero: number;
+    estado: string;
+    numero_factura: string | null;
+  };
+
+  // Contrato más reciente por propiedad (para mostrar el vínculo, y el N.º
+  // de factura cuando corresponda: la factura se registra a nivel del
+  // contrato, no de la propiedad). Una propiedad puede, en teoría, pasar
+  // por más de un contrato en el tiempo.
+  const contratoPorPropiedad = new Map<string, ContratoRelPropiedad>();
   for (const v of vinculos ?? []) {
-    const c = v.contratos as { numero: number; estado: string } | { numero: number; estado: string }[] | null;
+    const c = v.contratos as ContratoRelPropiedad | ContratoRelPropiedad[] | null;
     const contrato = Array.isArray(c) ? c[0] : c;
     if (contrato && !contratoPorPropiedad.has(v.propiedad_id)) {
       contratoPorPropiedad.set(v.propiedad_id, contrato);
@@ -263,8 +271,8 @@ export default async function PropiedadesPage({
                         )}
                         {p.estado === "facturado" && (
                           <span className="text-purple-700">
-                            {p.numero_factura
-                              ? `Factura N.º ${p.numero_factura}`
+                            {contrato?.numero_factura
+                              ? `Factura N.º ${contrato.numero_factura}`
                               : "Sin número de factura"}
                           </span>
                         )}

@@ -13,6 +13,7 @@ const ESTADO_LABELS: Record<string, string> = {
   activo: "Activo",
   paz_y_salvo_sin_escritura: "Paz y salvo sin escritura",
   escriturado: "Escriturado",
+  facturado: "Facturado",
   anulado: "Anulado",
 };
 
@@ -172,6 +173,14 @@ export default async function EstadoCuentaContratoPage({
             <p className="text-sm font-semibold text-slate-900">
               {ESTADO_LABELS[contrato.estado] ?? contrato.estado}
             </p>
+            {contrato.estado === "facturado" && (
+              <p className="mt-0.5 text-xs text-slate-500">
+                {contrato.numero_factura
+                  ? `Factura N.º ${contrato.numero_factura}`
+                  : "Sin número de factura"}
+                {contrato.fecha_factura ? ` · ${formatDate(contrato.fecha_factura)}` : ""}
+              </p>
+            )}
           </div>
           <div className="rounded-md bg-slate-50 px-3 py-2">
             <p className="text-xs text-slate-500">Fecha de inicio</p>

@@ -3,6 +3,13 @@
 import { useEffect, useState } from "react";
 import type { Propiedad, Proyecto } from "@/lib/types";
 
+const ESTADO_LABELS: Record<string, string> = {
+  disponible: "Disponible",
+  prometido_en_venta: "Prometido en venta",
+  escriturado: "Escriturado",
+  facturado: "Facturado",
+};
+
 export function PropiedadForm({
   propiedad,
   proyectos,
@@ -16,7 +23,6 @@ export function PropiedadForm({
   action: (formData: FormData) => void;
   error?: string;
 }) {
-  const [estado, setEstado] = useState(propiedad?.estado ?? "disponible");
   const [proyectoId, setProyectoId] = useState(propiedad?.proyecto_id ?? "");
   const [superficie, setSuperficie] = useState(
     propiedad?.superficie_m2 != null ? String(propiedad.superficie_m2) : ""
@@ -139,70 +145,43 @@ export function PropiedadForm({
           </p>
         )}
       </div>
-      <div>
-        <label className="block text-sm font-medium text-slate-700">Estado</label>
-        <select
-          name="estado"
-          value={estado}
-          onChange={(e) => setEstado(e.target.value)}
-          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-        >
-          <option value="disponible">Disponible</option>
-          <option value="prometido_en_venta">Prometido en venta</option>
-          <option value="escriturado">Escriturado</option>
-          <option value="facturado">Facturado</option>
-        </select>
-      </div>
 
-      {estado === "prometido_en_venta" && (
-        <div className="col-span-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          {contratoVinculado ? (
-            <>
-              Vinculada al <strong>Contrato N.º {contratoVinculado.numero}</strong> (estado:{" "}
-              {contratoVinculado.estado}).
-            </>
-          ) : (
-            "Todavía no hay un contrato vinculado a esta propiedad. El vínculo se crea automáticamente al registrar un contrato para ella."
+      {propiedad && (
+        <div className="col-span-2 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">
+          <span className="font-medium text-slate-700">Estado actual: </span>
+          {ESTADO_LABELS[propiedad.estado ?? "disponible"] ?? propiedad.estado}
+          <p className="mt-1 text-xs text-slate-400">
+            El estado ya no se edita manualmente: se calcula solo a partir del contrato
+            vinculado (activo/paz y salvo → prometido en venta, escriturado → escriturado,
+            facturado → facturado, anulado o sin contrato → disponible).
+          </p>
+          {propiedad.estado === "prometido_en_venta" && (
+            <p className="mt-1 text-xs text-amber-700">
+              {contratoVinculado
+                ? `Vinculada al Contrato N.º ${contratoVinculado.numero} (estado: ${contratoVinculado.estado}).`
+                : "Todavía no hay un contrato vinculado a esta propiedad."}
+            </p>
           )}
         </div>
       )}
 
-      {estado === "escriturado" && (
-        <>
-          <div>
-            <label className="block text-sm font-medium text-slate-700">
-              Número de escritura
-            </label>
-            <input
-              name="numero_escritura"
-              defaultValue={propiedad?.numero_escritura ?? ""}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700">
-              Fecha de escritura
-            </label>
-            <input
-              type="date"
-              name="fecha_escritura"
-              defaultValue={propiedad?.fecha_escritura ?? ""}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-          </div>
-        </>
-      )}
-
-      {estado === "facturado" && (
-        <div>
-          <label className="block text-sm font-medium text-slate-700">Número de factura</label>
-          <input
-            name="numero_factura"
-            defaultValue={propiedad?.numero_factura ?? ""}
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-          />
-        </div>
-      )}
+      <div>
+        <label className="block text-sm font-medium text-slate-700">Número de escritura</label>
+        <input
+          name="numero_escritura"
+          defaultValue={propiedad?.numero_escritura ?? ""}
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-slate-700">Fecha de escritura</label>
+        <input
+          type="date"
+          name="fecha_escritura"
+          defaultValue={propiedad?.fecha_escritura ?? ""}
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+        />
+      </div>
 
       <div className="col-span-2">
         <label className="block text-sm font-medium text-slate-700">Descripción</label>

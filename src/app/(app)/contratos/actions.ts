@@ -110,14 +110,10 @@ export async function crearContrato(formData: FormData) {
     redirect(`/contratos/nuevo?error=${encodeURIComponent(errorCuotas.message)}`);
   }
 
-  // Las propiedades pasan a "prometido en venta" al quedar ligadas a un
-  // contrato (solo si todavía estaban disponibles; no se pisa un estado
-  // más avanzado como escriturado/facturado). Se usa una función RPC en vez
-  // de un update directo porque "propiedades" solo admite UPDATE directo
-  // desde admin; esta función puntual sí puede llamarla cualquier usuario
-  // autenticado, ya que es un efecto colateral de crear el contrato (una
-  // acción de alta, no una edición manual).
-  await supabase.rpc("marcar_propiedades_prometidas", { ids: propiedadIds });
+  // El estado de las propiedades vinculadas se actualiza solo: un trigger
+  // en la base de datos, disparado por el INSERT en "contrato_propiedades"
+  // de arriba, las pasa a "prometido en venta" automáticamente (ver
+  // recalcular_estado_propiedad / unificación de estados).
 
   revalidatePath("/contratos");
   revalidatePath("/cuotas");
@@ -154,12 +150,7 @@ export async function actualizarContrato(id: string, formData: FormData) {
   // formulario: cualquier cambio de comprador se hace con "Ceder contrato"
   // (ver cederContrato más abajo), para que siempre quede un registro de la
   // cesión. Por eso "cliente_id" se descarta aunque venga en el formulario.
-  const { data: contratoAnterior } = await supabase
-    .from("contratos")
-    .select("estado")
-    .eq("id", id)
-    .single();
-
+  //
   // No se regenera el plan de cuotas al editar: solo se actualizan los
   // datos del contrato. El plan de cuotas se gestiona desde /cuotas o con
   // un otrosí (ver reestructurarPlanPago).
@@ -192,27 +183,11 @@ export async function actualizarContrato(id: string, formData: FormData) {
       .from("contrato_propiedades")
       .insert(aAgregar.map((propiedad_id) => ({ contrato_id: id, propiedad_id })));
   }
-  if (aAgregar.length > 0) {
-    await supabase
-      .from("propiedades")
-      .update({ estado: "prometido_en_venta" })
-      .in("id", aAgregar)
-      .eq("estado", "disponible");
-  }
 
-  // Si el contrato pasó a "anulado" recién ahora, se liberan sus
-  // propiedades/lotes (las que seguían en "prometido en venta") para que
-  // vuelvan a quedar disponibles para la venta.
-  if (data.estado === "anulado" && contratoAnterior?.estado !== "anulado") {
-    const idsVinculadas = [...idsNuevos];
-    if (idsVinculadas.length > 0) {
-      await supabase
-        .from("propiedades")
-        .update({ estado: "disponible" })
-        .in("id", idsVinculadas)
-        .eq("estado", "prometido_en_venta");
-    }
-  }
+  // El estado de las propiedades (las que se agregaron, las que se
+  // quitaron, y las que se quedaron si el estado del contrato cambió) se
+  // recalcula solo mediante triggers en la base de datos — no hace falta
+  // ningún update manual aquí (ver recalcular_estado_propiedad).
 
   revalidatePath("/contratos");
   revalidatePath("/propiedades");
@@ -223,6 +198,7 @@ const ESTADOS_CONTRATO_VALIDOS = [
   "activo",
   "paz_y_salvo_sin_escritura",
   "escriturado",
+  "facturado",
   "anulado",
 ];
 
@@ -248,11 +224,6 @@ export async function actualizarEstadoEnBloque(formData: FormData) {
     redirect(`${redirectTo}?error=${encodeURIComponent("Selecciona un estado válido.")}`);
   }
 
-  const { data: contratosAnteriores } = await supabase
-    .from("contratos")
-    .select("id, estado")
-    .in("id", ids);
-
   const { error } = await supabase
     .from("contratos")
     .update({ estado: nuevoEstado })
@@ -262,27 +233,9 @@ export async function actualizarEstadoEnBloque(formData: FormData) {
     redirect(`${redirectTo}?error=${encodeURIComponent(error.message)}`);
   }
 
-  if (nuevoEstado === "anulado") {
-    const idsQuePasanAAnulado = (contratosAnteriores ?? [])
-      .filter((c) => c.estado !== "anulado")
-      .map((c) => c.id);
-
-    if (idsQuePasanAAnulado.length > 0) {
-      const { data: vinculos } = await supabase
-        .from("contrato_propiedades")
-        .select("propiedad_id")
-        .in("contrato_id", idsQuePasanAAnulado);
-      const propiedadIds = (vinculos ?? []).map((v) => v.propiedad_id);
-
-      if (propiedadIds.length > 0) {
-        await supabase
-          .from("propiedades")
-          .update({ estado: "disponible" })
-          .in("id", propiedadIds)
-          .eq("estado", "prometido_en_venta");
-      }
-    }
-  }
+  // El estado de las propiedades vinculadas a cada contrato (por ejemplo,
+  // liberarlas si alguno quedó "anulado") se recalcula solo mediante
+  // triggers en la base de datos.
 
   revalidatePath("/contratos");
   revalidatePath("/propiedades");
@@ -293,24 +246,11 @@ export async function eliminarContrato(id: string) {
   await requireAdmin("/contratos");
   const supabase = await createClient();
 
-  // Se capturan las propiedades vinculadas ANTES de borrar el contrato
-  // (el borrado elimina en cascada esos vínculos), para poder liberarlas
-  // después y que no queden marcadas "prometido en venta" para siempre.
-  const { data: vinculos } = await supabase
-    .from("contrato_propiedades")
-    .select("propiedad_id")
-    .eq("contrato_id", id);
-  const propiedadIds = (vinculos ?? []).map((v) => v.propiedad_id);
-
+  // Borrar el contrato elimina en cascada sus vínculos en
+  // "contrato_propiedades"; un trigger en esa tabla recalcula solo el
+  // estado de cada propiedad que quedó desvinculada (vuelve a "disponible"
+  // si no le queda ningún otro contrato vigente).
   await supabase.from("contratos").delete().eq("id", id);
-
-  if (propiedadIds.length > 0) {
-    await supabase
-      .from("propiedades")
-      .update({ estado: "disponible" })
-      .in("id", propiedadIds)
-      .eq("estado", "prometido_en_venta");
-  }
 
   revalidatePath("/contratos");
   revalidatePath("/cuotas");
@@ -680,7 +620,8 @@ export async function crearContratoDesdePromesa(formData: FormData) {
     redirect(`/contratos/nueva-promesa?error=${encodeURIComponent(errorCuotas.message)}`);
   }
 
-  await supabase.rpc("marcar_propiedades_prometidas", { ids: propiedadIds });
+  // El estado de las propiedades vinculadas se actualiza solo (ver
+  // recalcular_estado_propiedad / unificación de estados).
 
   revalidatePath("/contratos");
   revalidatePath("/cuotas");

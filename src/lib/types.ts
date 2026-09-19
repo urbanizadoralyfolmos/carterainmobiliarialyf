@@ -64,6 +64,8 @@ export type Contrato = {
   dia_vencimiento: number;
   tasa_mora_mensual: number;
   estado: string;
+  numero_factura: string | null;
+  fecha_factura: string | null;
   notas: string | null;
   created_at: string;
   clientes?: Cliente;

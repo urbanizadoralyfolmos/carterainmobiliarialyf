@@ -11,6 +11,7 @@ const links = [
   { href: "/contratos", label: "Contratos" },
   { href: "/cuotas", label: "Cuotas" },
   { href: "/recibos", label: "Recibos" },
+  { href: "/facturas", label: "Facturas" },
   { href: "/reportes", label: "Reportes" },
 ];
 

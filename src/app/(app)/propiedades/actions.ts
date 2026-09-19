@@ -5,9 +5,12 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/auth/rol";
 
+// El estado de una propiedad ya no se lee ni se escribe desde este
+// formulario: se calcula automáticamente a partir del contrato vinculado
+// (ver la función `recalcular_estado_propiedad` y sus triggers en la base
+// de datos). Incluirlo aquí en un UPDATE haría fallar el guardado, porque
+// la base de datos rechaza cualquier cambio manual a esa columna.
 function readPropiedadForm(formData: FormData) {
-  const estado = String(formData.get("estado") ?? "disponible");
-
   return {
     direccion: String(formData.get("direccion") ?? "").trim(),
     ciudad: String(formData.get("ciudad") ?? "").trim() || null,
@@ -18,22 +21,11 @@ function readPropiedadForm(formData: FormData) {
     valor_referencia: formData.get("valor_referencia")
       ? Number(formData.get("valor_referencia"))
       : null,
-    estado,
     proyecto_id: String(formData.get("proyecto_id") ?? "").trim() || null,
     numero_lote: String(formData.get("numero_lote") ?? "").trim() || null,
     manzana: String(formData.get("manzana") ?? "").trim() || null,
-    numero_escritura:
-      estado === "escriturado"
-        ? String(formData.get("numero_escritura") ?? "").trim() || null
-        : null,
-    fecha_escritura:
-      estado === "escriturado"
-        ? String(formData.get("fecha_escritura") ?? "").trim() || null
-        : null,
-    numero_factura:
-      estado === "facturado"
-        ? String(formData.get("numero_factura") ?? "").trim() || null
-        : null,
+    numero_escritura: String(formData.get("numero_escritura") ?? "").trim() || null,
+    fecha_escritura: String(formData.get("fecha_escritura") ?? "").trim() || null,
     descripcion: String(formData.get("descripcion") ?? "").trim() || null,
   };
 }

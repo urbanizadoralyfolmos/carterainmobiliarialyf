@@ -225,13 +225,17 @@ export function ContratoForm({
             <option value="activo">Activo</option>
             <option value="paz_y_salvo_sin_escritura">Paz y salvo sin escritura</option>
             <option value="escriturado">Escriturado</option>
+            <option value="facturado">Facturado</option>
             <option value="anulado">Anulado</option>
           </select>
           {contrato?.estado === "anulado" ? null : (
             <p className="mt-1 text-xs text-slate-400">
               &quot;Paz y salvo sin escritura&quot; se marca solo cuando se pagan todas las
-              cuotas. Al marcar &quot;Anulado&quot;, las propiedades/lotes de este contrato
-              vuelven a quedar disponibles para la venta.
+              cuotas. &quot;Facturado&quot; normalmente se marca solo desde el módulo de
+              Facturas (al registrar el número de factura). Al marcar &quot;Anulado&quot;,
+              las propiedades/lotes de este contrato vuelven a quedar disponibles para la
+              venta; con &quot;Escriturado&quot; o &quot;Facturado&quot; pasan al estado
+              correspondiente.
             </p>
           )}
         </div>
