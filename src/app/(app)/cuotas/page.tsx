@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatMoney, formatDate } from "@/lib/utils/format";
 import { calcularMora } from "@/lib/utils/mora";
-import { registrarPago, revertirPago } from "./actions";
+import { CuotaAccion } from "@/components/CuotaAccion";
 import { SearchInput } from "@/components/SearchInput";
 import { esAdmin } from "@/lib/auth/rol";
 
@@ -23,18 +23,21 @@ function nombreProyecto(rel: ProyectoRel) {
 export default async function CuotasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filtro?: string; q?: string; error?: string }>;
+  searchParams: Promise<{ filtro?: string; proyecto?: string; q?: string; error?: string }>;
 }) {
-  const { filtro = "todas", q, error: errorParam } = await searchParams;
+  const { filtro = "todas", proyecto: proyectoFiltro, q, error: errorParam } = await searchParams;
   const supabase = await createClient();
   const admin = await esAdmin();
 
-  const { data: cuotas, error } = await supabase
-    .from("cuotas")
-    .select(
-      "*, contratos(numero, moneda, clientes(nombre, apellido, razon_social, tipo_persona, documento, nit), contrato_propiedades(propiedades(direccion, proyectos(nombre))))"
-    )
-    .order("fecha_vencimiento", { ascending: true });
+  const [{ data: cuotas, error }, { data: proyectos }] = await Promise.all([
+    supabase
+      .from("cuotas")
+      .select(
+        "*, contratos(numero, moneda, clientes(nombre, apellido, razon_social, tipo_persona, documento, nit), contrato_propiedades(propiedades(direccion, proyecto_id, proyectos(nombre))))"
+      )
+      .order("fecha_vencimiento", { ascending: true }),
+    supabase.from("proyectos").select("id, nombre").order("nombre"),
+  ]);
 
   const hoy = new Date().toISOString().slice(0, 10);
 
@@ -45,7 +48,7 @@ export default async function CuotasPage({
     });
     const enMora = cuota.estado !== "pagada" && cuota.fecha_vencimiento < hoy;
     const propiedadesRel = (cuota.contratos?.contrato_propiedades ?? []) as {
-      propiedades: { direccion: string; proyectos?: ProyectoRel } | null;
+      propiedades: { direccion: string; proyecto_id: string | null; proyectos?: ProyectoRel } | null;
     }[];
     const propiedadesTexto = propiedadesRel
       .map((cp) => cp.propiedades?.direccion)
@@ -55,6 +58,13 @@ export default async function CuotasPage({
       .map((cp) => nombreProyecto(cp.propiedades?.proyectos))
       .filter(Boolean)
       .join(", ");
+    const proyectoIds = Array.from(
+      new Set(
+        propiedadesRel
+          .map((cp) => cp.propiedades?.proyecto_id)
+          .filter((v): v is string => Boolean(v))
+      )
+    );
     const cliente = cuota.contratos?.clientes;
     const nombreCliente =
       cliente?.tipo_persona === "juridica" && cliente?.razon_social
@@ -70,6 +80,7 @@ export default async function CuotasPage({
       enMora,
       propiedadesTexto,
       proyectosTexto,
+      proyectoIds,
       nombreCliente,
       documento,
       numeroContrato,
@@ -86,6 +97,11 @@ export default async function CuotasPage({
       return c.estado === filtro;
     })
     .filter((c) => {
+      if (!proyectoFiltro) return true;
+      if (proyectoFiltro === "sin-proyecto") return c.proyectoIds.length === 0;
+      return c.proyectoIds.includes(proyectoFiltro);
+    })
+    .filter((c) => {
       if (!termino) return true;
       return (
         c.nombreCliente.toLowerCase().includes(termino) ||
@@ -97,6 +113,16 @@ export default async function CuotasPage({
       );
     });
 
+  const buildHref = (overrides: { filtro?: string; proyecto?: string }) => {
+    const params = new URLSearchParams();
+    const filtroValor = overrides.filtro ?? filtro;
+    const proyectoValor = "proyecto" in overrides ? overrides.proyecto : proyectoFiltro;
+    params.set("filtro", filtroValor);
+    if (proyectoValor) params.set("proyecto", proyectoValor);
+    if (q) params.set("q", q);
+    return `/cuotas?${params.toString()}`;
+  };
+
   return (
     <div>
       <h1 className="text-lg font-semibold text-slate-900">Cuotas</h1>
@@ -107,7 +133,7 @@ export default async function CuotasPage({
           {FILTROS.map((f) => (
             <Link
               key={f.value}
-              href={`/cuotas?filtro=${f.value}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+              href={buildHref({ filtro: f.value })}
               className={`rounded-md px-3 py-1.5 text-sm ${
                 filtro === f.value
                   ? "bg-brand text-white"
@@ -118,6 +144,40 @@ export default async function CuotasPage({
             </Link>
           ))}
         </div>
+      </div>
+
+      <div className="mt-2 flex flex-wrap gap-1">
+        <Link
+          href={buildHref({ proyecto: undefined })}
+          className={`rounded-md px-3 py-1.5 text-sm ${
+            !proyectoFiltro ? "bg-brand text-white" : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          Todos los proyectos
+        </Link>
+        <Link
+          href={buildHref({ proyecto: "sin-proyecto" })}
+          className={`rounded-md px-3 py-1.5 text-sm ${
+            proyectoFiltro === "sin-proyecto"
+              ? "bg-brand text-white"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          Sin proyecto
+        </Link>
+        {proyectos?.map((pr) => (
+          <Link
+            key={pr.id}
+            href={buildHref({ proyecto: pr.id })}
+            className={`rounded-md px-3 py-1.5 text-sm ${
+              proyectoFiltro === pr.id
+                ? "bg-brand text-white"
+                : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            {pr.nombre}
+          </Link>
+        ))}
       </div>
 
       {error && (
@@ -148,6 +208,10 @@ export default async function CuotasPage({
           <tbody className="divide-y divide-slate-100">
             {filtradas.map((c) => {
               const moneda = c.contratos?.moneda ?? "COP";
+              const etiquetaCuota = c.numero_cuota === 0 ? "Inicial" : `#${c.numero_cuota}`;
+              const resumen = `${c.nombreCliente || "Cliente sin nombre"} — Contrato N.º ${
+                c.numeroContrato ?? "-"
+              } — Cuota ${etiquetaCuota} — ${formatMoney(c.monto, moneda)}`;
               return (
                 <tr key={c.id} className={c.enMora ? "bg-red-50/50" : ""}>
                   <td className="px-4 py-2 font-medium text-slate-900">
@@ -158,7 +222,7 @@ export default async function CuotasPage({
                   <td className="px-4 py-2 text-slate-600">
                     {c.numeroContrato ? `N.º ${c.numeroContrato}` : "-"}
                   </td>
-                  <td className="px-4 py-2 text-slate-600">{c.numero_cuota === 0 ? "Inicial" : `#${c.numero_cuota}`}</td>
+                  <td className="px-4 py-2 text-slate-600">{etiquetaCuota}</td>
                   <td className="px-4 py-2 text-slate-600">
                     {formatDate(c.fecha_vencimiento)}
                   </td>
@@ -198,54 +262,15 @@ export default async function CuotasPage({
                     )}
                   </td>
                   <td className="whitespace-nowrap px-4 py-2 text-right">
-                    {c.estado === "pagada" || c.estado === "parcial" ? (
-                      <div className="flex flex-col items-end gap-1">
-                        <Link
-                          href={`/recibos?cuota=${c.id}`}
-                          className="text-xs text-slate-500 hover:text-slate-800 hover:underline"
-                        >
-                          Ver recibo(s)
-                        </Link>
-                        {c.estado === "pagada" && admin && (
-                          <form action={revertirPago.bind(null, c.id)}>
-                            <button
-                              type="submit"
-                              className="text-xs text-slate-500 hover:text-slate-800 hover:underline"
-                            >
-                              Revertir
-                            </button>
-                          </form>
-                        )}
-                      </div>
-                    ) : null}
-                    {c.estado !== "pagada" && (
-                      <form
-                        action={registrarPago.bind(null, c.id)}
-                        className="flex items-center justify-end gap-1"
-                      >
-                        <input type="hidden" name="monto_cuota" value={c.monto} />
-                        <input
-                          type="number"
-                          step="0.01"
-                          name="monto_pagado"
-                          defaultValue={c.monto}
-                          className="w-24 rounded-md border border-slate-300 px-2 py-1 text-xs"
-                        />
-                        <input
-                          type="text"
-                          name="referencia"
-                          placeholder="Referencia"
-                          defaultValue={c.referencia ?? ""}
-                          className="w-24 rounded-md border border-slate-300 px-2 py-1 text-xs"
-                        />
-                        <button
-                          type="submit"
-                          className="rounded-md bg-brand px-2 py-1 text-xs font-medium text-white hover:bg-brand-dark"
-                        >
-                          Pagar
-                        </button>
-                      </form>
-                    )}
+                    <CuotaAccion
+                      cuotaId={c.id}
+                      estado={c.estado}
+                      montoCuota={c.monto}
+                      montoPagado={c.monto_pagado}
+                      referencia={c.referencia}
+                      admin={admin}
+                      resumen={resumen}
+                    />
                   </td>
                 </tr>
               );

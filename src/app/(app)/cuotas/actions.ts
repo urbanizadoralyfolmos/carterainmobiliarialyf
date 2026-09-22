@@ -11,6 +11,9 @@ export async function registrarPago(id: string, formData: FormData) {
   const montoPagado = Number(formData.get("monto_pagado") ?? 0);
   const montoCuota = Number(formData.get("monto_cuota") ?? 0);
   const referencia = String(formData.get("referencia") ?? "").trim() || null;
+  const notas = String(formData.get("notas") ?? "").trim() || null;
+  const fechaPago =
+    String(formData.get("fecha_pago") ?? "").trim() || new Date().toISOString().slice(0, 10);
 
   const { data: cuotaActual } = await supabase
     .from("cuotas")
@@ -20,7 +23,6 @@ export async function registrarPago(id: string, formData: FormData) {
 
   const montoPagadoAnterior = cuotaActual?.monto_pagado ?? 0;
   const montoDelPago = Math.max(0, montoPagado - montoPagadoAnterior);
-  const fechaPago = new Date().toISOString().slice(0, 10);
   const estado = montoPagado >= montoCuota ? "pagada" : "parcial";
 
   await supabase
@@ -48,7 +50,7 @@ export async function registrarPago(id: string, formData: FormData) {
   if (montoDelPago > 0) {
     const { data: recibo } = await supabase
       .from("recibos")
-      .insert({ cuota_id: id, monto: montoDelPago, fecha_pago: fechaPago })
+      .insert({ cuota_id: id, monto: montoDelPago, fecha_pago: fechaPago, notas })
       .select("id")
       .single();
 
@@ -60,23 +62,91 @@ export async function registrarPago(id: string, formData: FormData) {
   redirect("/cuotas");
 }
 
-export async function revertirPago(id: string) {
+/**
+ * Reversa el ÚLTIMO pago activo (no anulado) de una cuota — por ejemplo si
+ * se aplicó por error a la cuota o al contrato equivocado. En vez de borrar
+ * el recibo, lo marca como anulado (con motivo, fecha y quién lo hizo) para
+ * dejar rastro de que hubo un pago mal aplicado y se corrigió. El monto
+ * pagado y el estado de la cuota se recalculan siempre desde cero, sumando
+ * únicamente los recibos que sigan activos — así queda correcto aunque la
+ * cuota tenga más de un pago parcial.
+ */
+export async function revertirPago(id: string, formData: FormData) {
   await requireAdmin("/cuotas");
   const supabase = await createClient();
 
+  const motivo = String(formData.get("motivo") ?? "").trim();
+  if (!motivo) {
+    redirect(`/cuotas?error=${encodeURIComponent("Tenés que indicar un motivo para reversar el pago.")}`);
+  }
+
   const { data: cuotaActual } = await supabase
     .from("cuotas")
-    .select("contrato_id")
+    .select("contrato_id, monto")
     .eq("id", id)
     .single();
 
+  const { data: reciboActivo } = await supabase
+    .from("recibos")
+    .select("id")
+    .eq("cuota_id", id)
+    .eq("anulado", false)
+    .order("fecha_pago", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!reciboActivo) {
+    redirect(
+      `/cuotas?error=${encodeURIComponent("Esta cuota no tiene ningún pago activo para reversar.")}`
+    );
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   await supabase
-    .from("cuotas")
-    .update({ monto_pagado: 0, estado: "pendiente", fecha_pago: null, referencia: null })
-    .eq("id", id);
+    .from("recibos")
+    .update({
+      anulado: true,
+      anulado_motivo: motivo,
+      anulado_at: new Date().toISOString(),
+      anulado_por: user?.id ?? null,
+    })
+    .eq("id", reciboActivo.id);
+
+  const { data: recibosActivos } = await supabase
+    .from("recibos")
+    .select("monto, fecha_pago")
+    .eq("cuota_id", id)
+    .eq("anulado", false)
+    .order("fecha_pago", { ascending: false });
+
+  const montoPagado = (recibosActivos ?? []).reduce((suma, r) => suma + Number(r.monto), 0);
+  const montoCuota = cuotaActual?.monto ?? 0;
+  const nuevoEstado =
+    montoPagado <= 0 ? "pendiente" : montoPagado >= montoCuota ? "pagada" : "parcial";
+  const fechaPago = recibosActivos?.[0]?.fecha_pago ?? null;
+
+  const cuotaUpdate: {
+    monto_pagado: number;
+    estado: string;
+    fecha_pago: string | null;
+    referencia?: null;
+  } = {
+    monto_pagado: montoPagado,
+    estado: nuevoEstado,
+    fecha_pago: fechaPago,
+  };
+  if (montoPagado <= 0) {
+    cuotaUpdate.referencia = null;
+  }
+
+  await supabase.from("cuotas").update(cuotaUpdate).eq("id", id);
 
   // Si el contrato estaba "paz y salvo sin escritura" (todas pagadas), al
-  // revertir este pago ya no lo está: vuelve a "activo" automáticamente.
+  // reversar este pago puede que ya no lo esté: se vuelve a sincronizar.
   if (cuotaActual?.contrato_id) {
     await supabase.rpc("sincronizar_estado_contrato_por_pagos", {
       p_contrato_id: cuotaActual.contrato_id,
@@ -86,6 +156,9 @@ export async function revertirPago(id: string) {
   revalidatePath("/cuotas");
   revalidatePath("/dashboard");
   revalidatePath("/contratos");
+  revalidatePath("/recibos");
+  revalidatePath(`/recibos/${reciboActivo.id}`);
+  redirect("/cuotas");
 }
 
 /**
