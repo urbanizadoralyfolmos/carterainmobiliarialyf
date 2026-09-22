@@ -9,7 +9,6 @@ export function CuotaAccion({
   estado,
   montoCuota,
   montoPagado,
-  referencia,
   admin,
   resumen,
 }: {
@@ -17,7 +16,6 @@ export function CuotaAccion({
   estado: string;
   montoCuota: number;
   montoPagado: number;
-  referencia: string | null;
   admin: boolean;
   resumen: string;
 }) {
@@ -90,13 +88,6 @@ export function CuotaAccion({
               className="rounded-md border border-slate-300 px-2 py-1 text-xs"
             />
           </div>
-          <input
-            type="text"
-            name="referencia"
-            placeholder="Referencia"
-            defaultValue={referencia ?? ""}
-            className="w-full rounded-md border border-slate-300 px-2 py-1 text-xs"
-          />
           <input
             type="text"
             name="notas"

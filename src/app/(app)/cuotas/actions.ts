@@ -10,7 +10,6 @@ export async function registrarPago(id: string, formData: FormData) {
 
   const montoPagado = Number(formData.get("monto_pagado") ?? 0);
   const montoCuota = Number(formData.get("monto_cuota") ?? 0);
-  const referencia = String(formData.get("referencia") ?? "").trim() || null;
   const notas = String(formData.get("notas") ?? "").trim() || null;
   const fechaPago =
     String(formData.get("fecha_pago") ?? "").trim() || new Date().toISOString().slice(0, 10);
@@ -31,7 +30,6 @@ export async function registrarPago(id: string, formData: FormData) {
       monto_pagado: montoPagado,
       estado,
       fecha_pago: fechaPago,
-      referencia,
     })
     .eq("id", id);
 

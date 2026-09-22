@@ -267,7 +267,6 @@ export default async function CuotasPage({
                       estado={c.estado}
                       montoCuota={c.monto}
                       montoPagado={c.monto_pagado}
-                      referencia={c.referencia}
                       admin={admin}
                       resumen={resumen}
                     />
