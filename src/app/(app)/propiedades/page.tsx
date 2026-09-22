@@ -300,7 +300,8 @@ export default async function PropiedadesPage({
                   <tr>
                     <td colSpan={admin ? 10 : 9} className="px-4 py-6 text-center text-slate-400">
                       Todavía no hay propiedades cargadas.
-                                        </tr>
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
