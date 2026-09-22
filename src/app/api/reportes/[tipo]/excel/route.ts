@@ -121,8 +121,9 @@ export async function GET(
   const anioActual = new Date().getFullYear();
   const anioParseado = anioParam ? Number(anioParam) : anioActual;
   const anio = Number.isFinite(anioParseado) && anioParseado > 2000 ? anioParseado : anioActual;
+  const proyectoParam = req.nextUrl.searchParams.get("proyecto");
 
-  const data = await getReportes(anio);
+  const data = await getReportes(anio, proyectoParam);
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Urbanizadora LYF Olmos";
@@ -266,6 +267,41 @@ export async function GET(
         row.getCell(6).value = formatDate(lote.fecha_escritura);
         rowIdx++;
       }
+    }
+  } else if (reporteTipo === "lotes-disponibles") {
+    const sheet = workbook.addWorksheet("Lotes disponibles");
+    sheet.columns = [
+      { width: 30 },
+      { width: 22 },
+      { width: 12 },
+      { width: 12 },
+      { width: 14 },
+      { width: 18 },
+    ];
+    const headers = ["Dirección", "Proyecto", "Manzana", "Lote", "Área (m²)", "Valor"];
+    const headerRow = sheet.getRow(1);
+    headers.forEach((h, i) => headerCell(headerRow.getCell(i + 1), h));
+    data.lotesDisponibles.forEach((l, idx) => {
+      const row = sheet.getRow(idx + 2);
+      row.getCell(1).value = l.direccion;
+      row.getCell(2).value = l.proyecto;
+      row.getCell(3).value = l.manzana ?? "-";
+      row.getCell(4).value = l.numero_lote ?? "-";
+      row.getCell(5).value = l.superficie_m2 ?? 0;
+      row.getCell(5).numFmt = "#,##0.00";
+      row.getCell(6).value = l.valor_referencia ?? 0;
+      row.getCell(6).numFmt = "#,##0";
+    });
+    if (data.lotesDisponibles.length > 0) {
+      const totalRow = sheet.getRow(data.lotesDisponibles.length + 2);
+      totalRow.getCell(4).value = "Total";
+      totalRow.getCell(4).font = { bold: true };
+      totalRow.getCell(5).value = data.totalAreaLotesDisponibles;
+      totalRow.getCell(5).numFmt = "#,##0.00";
+      totalRow.getCell(5).font = { bold: true };
+      totalRow.getCell(6).value = data.totalValorLotesDisponibles;
+      totalRow.getCell(6).numFmt = "#,##0";
+      totalRow.getCell(6).font = { bold: true };
     }
   }
 

@@ -20,21 +20,24 @@ const VISTAS = [
 export default async function FacturasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; vista?: string; error?: string; ok?: string }>;
+  searchParams: Promise<{ q?: string; vista?: string; proyecto?: string; error?: string; ok?: string }>;
 }) {
-  const { q, vista = "pendientes", error: errorParam, ok } = await searchParams;
+  const { q, vista = "pendientes", proyecto: proyectoFiltro, error: errorParam, ok } = await searchParams;
   const supabase = await createClient();
   const admin = await esAdmin();
 
-  const { data: contratos, error } = await supabase
-    .from("contratos")
-    .select(
-      "id, numero, estado, numero_factura, fecha_factura, clientes(nombre, apellido, razon_social, tipo_persona, documento, nit), contrato_propiedades(propiedades(direccion, proyectos(nombre)))"
-    )
-    .neq("estado", "anulado")
-    .order("numero", { ascending: false });
+  const [{ data: contratos, error }, { data: proyectos }] = await Promise.all([
+    supabase
+      .from("contratos")
+      .select(
+        "id, numero, estado, numero_factura, fecha_factura, clientes(nombre, apellido, razon_social, tipo_persona, documento, nit), contrato_propiedades(propiedades(direccion, proyecto_id, proyectos(nombre)))"
+      )
+      .neq("estado", "anulado")
+      .order("numero", { ascending: false }),
+    supabase.from("proyectos").select("id, nombre").order("nombre"),
+  ]);
 
-  type PropiedadRel = { direccion: string; proyectos?: ProyectoRel } | null;
+  type PropiedadRel = { direccion: string; proyecto_id: string | null; proyectos?: ProyectoRel } | null;
 
   function unoDeMuchos<T>(rel: T | T[] | null | undefined): T | undefined {
     if (Array.isArray(rel)) return rel[0];
@@ -61,12 +64,20 @@ export default async function FacturasPage({
       .map((cp) => nombreProyecto(unoDeMuchos(cp.propiedades)?.proyectos))
       .filter(Boolean)
       .join(", ");
+    const proyectoIds = Array.from(
+      new Set(
+        propiedadesRel
+          .map((cp) => unoDeMuchos(cp.propiedades)?.proyecto_id)
+          .filter((v): v is string => Boolean(v))
+      )
+    );
     return {
       ...c,
       nombreCliente,
       documento: documento ?? "",
       propiedadesTexto,
       proyectosTexto,
+      proyectoIds,
     };
   });
 
@@ -74,9 +85,15 @@ export default async function FacturasPage({
     vista === "facturadas" ? c.estado === "facturado" : c.estado !== "facturado"
   );
 
+  const porProyecto = porVista.filter((c) => {
+    if (!proyectoFiltro) return true;
+    if (proyectoFiltro === "sin-proyecto") return c.proyectoIds.length === 0;
+    return c.proyectoIds.includes(proyectoFiltro);
+  });
+
   const termino = (q ?? "").trim().toLowerCase();
 
-  const filtrados = porVista.filter((c) => {
+  const filtrados = porProyecto.filter((c) => {
     if (!termino) return true;
     return (
       c.nombreCliente.toLowerCase().includes(termino) ||
@@ -88,9 +105,12 @@ export default async function FacturasPage({
     );
   });
 
-  function buildHref(v: string) {
+  function buildHref(overrides: { vista?: string; proyecto?: string }) {
     const params = new URLSearchParams();
-    params.set("vista", v);
+    const vistaValor = overrides.vista ?? vista;
+    const proyectoValor = "proyecto" in overrides ? overrides.proyecto : proyectoFiltro;
+    params.set("vista", vistaValor);
+    if (proyectoValor) params.set("proyecto", proyectoValor);
     if (q) params.set("q", q);
     return `/facturas?${params.toString()}`;
   }
@@ -124,7 +144,7 @@ export default async function FacturasPage({
         {VISTAS.map((v) => (
           <Link
             key={v.value}
-            href={buildHref(v.value)}
+            href={buildHref({ vista: v.value })}
             className={`rounded-full px-3 py-1 text-sm ${
               vista === v.value
                 ? "bg-brand-light text-brand-dark font-medium"
@@ -132,6 +152,40 @@ export default async function FacturasPage({
             }`}
           >
             {v.label}
+          </Link>
+        ))}
+      </div>
+
+      <div className="mt-2 flex flex-wrap gap-1">
+        <Link
+          href={buildHref({ proyecto: undefined })}
+          className={`rounded-md px-3 py-1.5 text-sm ${
+            !proyectoFiltro ? "bg-brand text-white" : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          Todos los proyectos
+        </Link>
+        <Link
+          href={buildHref({ proyecto: "sin-proyecto" })}
+          className={`rounded-md px-3 py-1.5 text-sm ${
+            proyectoFiltro === "sin-proyecto"
+              ? "bg-brand text-white"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          Sin proyecto
+        </Link>
+        {proyectos?.map((pr) => (
+          <Link
+            key={pr.id}
+            href={buildHref({ proyecto: pr.id })}
+            className={`rounded-md px-3 py-1.5 text-sm ${
+              proyectoFiltro === pr.id
+                ? "bg-brand text-white"
+                : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            {pr.nombre}
           </Link>
         ))}
       </div>
@@ -219,7 +273,7 @@ export default async function FacturasPage({
             {filtrados.length === 0 && (
               <tr>
                 <td colSpan={admin ? 6 : 5} className="px-4 py-6 text-center text-slate-400">
-                  {porVista.length === 0
+                  {porProyecto.length === 0
                     ? vista === "facturadas"
                       ? "Todavía no hay contratos facturados."
                       : "No hay contratos pendientes de facturar."

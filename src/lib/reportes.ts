@@ -15,6 +15,7 @@ export const REPORTE_TIPOS = [
   { tipo: "vencen-este-mes", etiqueta: "Cuotas que vencen este mes" },
   { tipo: "vencidas", etiqueta: "Cuotas vencidas" },
   { tipo: "escrituradas", etiqueta: "Lotes escriturados por proyecto" },
+  { tipo: "lotes-disponibles", etiqueta: "Lotes disponibles para venta" },
 ] as const;
 
 export type ReporteTipo = (typeof REPORTE_TIPOS)[number]["tipo"];
@@ -41,8 +42,14 @@ type ClienteRel = {
   tipo_persona: string;
 } | null;
 
+type PropiedadRel = {
+  direccion: string;
+  proyecto_id: string | null;
+  proyectos?: ProyectoRel;
+} | null;
+
 type ContratoPropiedadesRel = {
-  propiedades: { direccion: string; proyectos?: ProyectoRel } | null;
+  propiedades: PropiedadRel;
 }[];
 
 type ContratoConPropiedadesRel = {
@@ -88,6 +95,16 @@ export type PropiedadEscrituradaRow = {
   proyectos?: ProyectoRel;
 };
 
+export type LoteDisponibleRow = {
+  id: string;
+  direccion: string;
+  manzana: string | null;
+  numero_lote: string | null;
+  superficie_m2: number | null;
+  valor_referencia: number | null;
+  proyecto: string;
+};
+
 function nombreClienteDe(cliente: ClienteRel) {
   if (!cliente) return "-";
   if (cliente.tipo_persona === "juridica" && cliente.razon_social) return cliente.razon_social;
@@ -111,6 +128,29 @@ function proyectosDe(contrato: ContratoConPropiedadesRel | ContratoSoloProyectos
 function proyectoTextoDe(contrato: ContratoConPropiedadesRel | ContratoSoloProyectosRel) {
   const nombres = proyectosDe(contrato);
   return nombres.length > 0 ? nombres.join(", ") : "Sin proyecto";
+}
+
+/**
+ * IDs (no nombres) de los proyectos vinculados a un contrato a través de sus
+ * propiedades. Se usa para filtrar los reportes por proyecto de forma
+ * confiable (por id, no por nombre, que en teoría podría repetirse).
+ */
+function proyectoIdsDe(contrato: ContratoConPropiedadesRel | ContratoSoloProyectosRel) {
+  const ids = (contrato?.contrato_propiedades ?? [])
+    .map((cp) => cp.propiedades?.proyecto_id)
+    .filter((id): id is string => Boolean(id));
+  return Array.from(new Set(ids));
+}
+
+/**
+ * true si el conjunto de ids de proyecto de una fila coincide con el filtro
+ * seleccionado: sin filtro (todos), "sin-proyecto" (ningún proyecto
+ * vinculado), o un id de proyecto puntual.
+ */
+function coincideProyecto(ids: string[], proyectoId?: string | null) {
+  if (!proyectoId) return true;
+  if (proyectoId === "sin-proyecto") return ids.length === 0;
+  return ids.includes(proyectoId);
 }
 
 export type ReporteMesFila = {
@@ -145,6 +185,8 @@ export type ReporteEscrituraProyecto = {
 
 export type ReportesData = {
   anio: number;
+  proyectoSeleccionado: string | null;
+  proyectosDisponibles: { id: string; nombre: string }[];
   // 1) Recaudo real (recibos ya cobrados)
   proyectos: string[];
   filasPorMes: ReporteMesFila[];
@@ -169,6 +211,11 @@ export type ReportesData = {
   // 5) Lotes escriturados por proyecto
   escrituradasPorProyecto: ReporteEscrituraProyecto[];
   totalEscrituradas: number;
+  // 6) Lotes disponibles para venta
+  lotesDisponibles: LoteDisponibleRow[];
+  totalLotesDisponibles: number;
+  totalAreaLotesDisponibles: number;
+  totalValorLotesDisponibles: number;
 };
 
 function agruparPorMesYProyecto<T extends { fecha: string; monto: number; proyectos: string[] }>(
@@ -268,17 +315,56 @@ function agruparPorAnioYProyecto<T extends { fecha: string; monto: number; proye
 
 /**
  * Calcula todos los datos del módulo de Reportes (recaudo real y esperado por
- * mes/proyecto, cuotas por vencer este mes, cuotas vencidas y lotes
- * escriturados por proyecto). Se usa tanto en la página de pantalla como en
- * los endpoints de exportación a Excel y PDF, para no duplicar la consulta
- * ni la lógica.
+ * mes/proyecto, cuotas por vencer este mes, cuotas vencidas, lotes
+ * escriturados por proyecto y lotes disponibles para venta). Se usa tanto en
+ * la página de pantalla como en los endpoints de exportación a Excel y PDF,
+ * para no duplicar la consulta ni la lógica.
+ *
+ * `proyectoId` es opcional: si se indica, todos los reportes de esta función
+ * quedan filtrados a ese proyecto puntual ("sin-proyecto" filtra los que no
+ * tienen ningún proyecto vinculado). Sin indicarlo, se muestran todos.
  */
-export async function getReportes(anio: number): Promise<ReportesData> {
+export async function getReportes(
+  anio: number,
+  proyectoId?: string | null
+): Promise<ReportesData> {
   const supabase = await createClient();
 
   const hoy = new Date();
   const hoyStr = hoy.toISOString().slice(0, 10);
   const finMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).toISOString().slice(0, 10);
+
+  let queryEscrituradas = supabase
+    .from("propiedades")
+    .select(
+      "id, direccion, manzana, numero_lote, numero_escritura, fecha_escritura, proyectos(nombre)"
+    )
+    // Un lote sigue "escriturado" (tiene número/fecha de escritura) aunque
+    // luego se facture: por eso este reporte incluye ambos estados.
+    .in("estado", ["escriturado", "facturado"])
+    .order("direccion");
+
+  if (proyectoId === "sin-proyecto") {
+    queryEscrituradas = queryEscrituradas.is("proyecto_id", null);
+  } else if (proyectoId) {
+    queryEscrituradas = queryEscrituradas.eq("proyecto_id", proyectoId);
+  }
+
+  let queryLotesDisponibles = supabase
+    .from("propiedades")
+    .select(
+      "id, direccion, manzana, numero_lote, superficie_m2, valor_referencia, proyectos(nombre)"
+    )
+    .eq("tipo", "lote")
+    .eq("estado", "disponible")
+    .order("manzana")
+    .order("numero_lote");
+
+  if (proyectoId === "sin-proyecto") {
+    queryLotesDisponibles = queryLotesDisponibles.is("proyecto_id", null);
+  } else if (proyectoId) {
+    queryLotesDisponibles = queryLotesDisponibles.eq("proyecto_id", proyectoId);
+  }
 
   const [
     { data: recibosData },
@@ -286,18 +372,20 @@ export async function getReportes(anio: number): Promise<ReportesData> {
     { data: cuotasEsperadasTodosAniosData },
     { data: cuotasData },
     { data: escrituradasData },
+    { data: lotesDisponiblesData },
+    { data: proyectosDisponiblesData },
   ] = await Promise.all([
     supabase
       .from("recibos")
       .select(
-        "monto, fecha_pago, cuotas(contratos(contrato_propiedades(propiedades(direccion, proyectos(nombre)))))"
+        "monto, fecha_pago, cuotas(contratos(contrato_propiedades(propiedades(direccion, proyecto_id, proyectos(nombre)))))"
       )
       .gte("fecha_pago", `${anio}-01-01`)
       .lte("fecha_pago", `${anio}-12-31`),
     supabase
       .from("cuotas")
       .select(
-        "monto, fecha_vencimiento, contratos(contrato_propiedades(propiedades(direccion, proyectos(nombre))))"
+        "monto, fecha_vencimiento, contratos(contrato_propiedades(propiedades(direccion, proyecto_id, proyectos(nombre))))"
       )
       .gte("fecha_vencimiento", `${anio}-01-01`)
       .lte("fecha_vencimiento", `${anio}-12-31`),
@@ -307,66 +395,66 @@ export async function getReportes(anio: number): Promise<ReportesData> {
     supabase
       .from("cuotas")
       .select(
-        "monto, fecha_vencimiento, contratos(contrato_propiedades(propiedades(direccion, proyectos(nombre))))"
+        "monto, fecha_vencimiento, contratos(contrato_propiedades(propiedades(direccion, proyecto_id, proyectos(nombre))))"
       ),
     supabase
       .from("cuotas")
       .select(
-        "id, numero_cuota, fecha_vencimiento, monto, monto_pagado, estado, contratos(numero, moneda, clientes(nombre, apellido, razon_social, tipo_persona), contrato_propiedades(propiedades(direccion, proyectos(nombre))))"
+        "id, numero_cuota, fecha_vencimiento, monto, monto_pagado, estado, contratos(numero, moneda, clientes(nombre, apellido, razon_social, tipo_persona), contrato_propiedades(propiedades(direccion, proyecto_id, proyectos(nombre))))"
       )
       .neq("estado", "pagada")
       .order("fecha_vencimiento", { ascending: true }),
-    supabase
-      .from("propiedades")
-      .select(
-        "id, direccion, manzana, numero_lote, numero_escritura, fecha_escritura, proyectos(nombre)"
-      )
-      // Un lote sigue "escriturado" (tiene número/fecha de escritura) aunque
-      // luego se facture: por eso este reporte incluye ambos estados.
-      .in("estado", ["escriturado", "facturado"])
-      .order("direccion"),
+    queryEscrituradas,
+    queryLotesDisponibles,
+    supabase.from("proyectos").select("id, nombre").order("nombre"),
   ]);
 
   // --- 1) Dinero recaudado (real) por mes y proyecto ---
-  const filasRecaudoReal = ((recibosData ?? []) as unknown as RecibosPorMesRow[]).map((r) => ({
-    fecha: r.fecha_pago,
-    monto: Number(r.monto),
-    proyectos: proyectosDe(r.cuotas?.contratos ?? null),
-  }));
+  const filasRecaudoReal = ((recibosData ?? []) as unknown as RecibosPorMesRow[])
+    .filter((r) => coincideProyecto(proyectoIdsDe(r.cuotas?.contratos ?? null), proyectoId))
+    .map((r) => ({
+      fecha: r.fecha_pago,
+      monto: Number(r.monto),
+      proyectos: proyectosDe(r.cuotas?.contratos ?? null),
+    }));
   const recaudoReal = agruparPorMesYProyecto(filasRecaudoReal);
 
   // --- 2) Dinero recaudado esperado (según vencimiento de cuota) por mes y proyecto ---
-  const filasRecaudoEsperado = ((cuotasEsperadasData ?? []) as unknown as CuotasEsperadasRow[]).map(
-    (c) => ({
+  const filasRecaudoEsperado = ((cuotasEsperadasData ?? []) as unknown as CuotasEsperadasRow[])
+    .filter((c) => coincideProyecto(proyectoIdsDe(c.contratos), proyectoId))
+    .map((c) => ({
       fecha: c.fecha_vencimiento,
       monto: Number(c.monto),
       proyectos: proyectosDe(c.contratos),
-    })
-  );
+    }));
   const recaudoEsperado = agruparPorMesYProyecto(filasRecaudoEsperado);
 
   // --- 2b) Dinero recaudado esperado por año y proyecto (todos los años) ---
   const filasRecaudoEsperadoPorAnio = (
     (cuotasEsperadasTodosAniosData ?? []) as unknown as CuotasEsperadasRow[]
-  ).map((c) => ({
-    fecha: c.fecha_vencimiento,
-    monto: Number(c.monto),
-    proyectos: proyectosDe(c.contratos),
-  }));
+  )
+    .filter((c) => coincideProyecto(proyectoIdsDe(c.contratos), proyectoId))
+    .map((c) => ({
+      fecha: c.fecha_vencimiento,
+      monto: Number(c.monto),
+      proyectos: proyectosDe(c.contratos),
+    }));
   const recaudoEsperadoPorAnio = agruparPorAnioYProyecto(filasRecaudoEsperadoPorAnio);
 
   // --- 3) y 4) Cuotas por vencer este mes / ya vencidas ---
-  const cuotasBase = ((cuotasData ?? []) as unknown as CuotaReporteRow[]).map((c) => ({
-    id: c.id,
-    numero_cuota: c.numero_cuota,
-    fecha_vencimiento: c.fecha_vencimiento,
-    estado: c.estado,
-    nombreCliente: nombreClienteDe(c.contratos?.clientes ?? null),
-    propiedadesTexto: propiedadesTextoDe(c.contratos),
-    proyectoTexto: proyectoTextoDe(c.contratos),
-    numeroContrato: c.contratos?.numero ?? null,
-    saldo: Math.max(0, c.monto - c.monto_pagado),
-  }));
+  const cuotasBase = ((cuotasData ?? []) as unknown as CuotaReporteRow[])
+    .filter((c) => coincideProyecto(proyectoIdsDe(c.contratos), proyectoId))
+    .map((c) => ({
+      id: c.id,
+      numero_cuota: c.numero_cuota,
+      fecha_vencimiento: c.fecha_vencimiento,
+      estado: c.estado,
+      nombreCliente: nombreClienteDe(c.contratos?.clientes ?? null),
+      propiedadesTexto: propiedadesTextoDe(c.contratos),
+      proyectoTexto: proyectoTextoDe(c.contratos),
+      numeroContrato: c.contratos?.numero ?? null,
+      saldo: Math.max(0, c.monto - c.monto_pagado),
+    }));
 
   const cuotasVencenEsteMes: ReporteCuota[] = cuotasBase
     .filter((c) => c.fecha_vencimiento >= hoyStr && c.fecha_vencimiento <= finMes)
@@ -399,8 +487,39 @@ export async function getReportes(anio: number): Promise<ReportesData> {
     (proyecto) => ({ proyecto, lotes: escrituradasMap.get(proyecto) ?? [] })
   );
 
+  // --- 6) Lotes disponibles para venta ---
+  const lotesDisponibles: LoteDisponibleRow[] = (
+    (lotesDisponiblesData ?? []) as unknown as {
+      id: string;
+      direccion: string;
+      manzana: string | null;
+      numero_lote: string | null;
+      superficie_m2: number | null;
+      valor_referencia: number | null;
+      proyectos?: ProyectoRel;
+    }[]
+  ).map((p) => ({
+    id: p.id,
+    direccion: p.direccion,
+    manzana: p.manzana,
+    numero_lote: p.numero_lote,
+    superficie_m2: p.superficie_m2,
+    valor_referencia: p.valor_referencia,
+    proyecto: nombreProyecto(p.proyectos) || "Sin proyecto",
+  }));
+  const totalAreaLotesDisponibles = lotesDisponibles.reduce(
+    (acc, l) => acc + (l.superficie_m2 ?? 0),
+    0
+  );
+  const totalValorLotesDisponibles = lotesDisponibles.reduce(
+    (acc, l) => acc + (l.valor_referencia ?? 0),
+    0
+  );
+
   return {
     anio,
+    proyectoSeleccionado: proyectoId ?? null,
+    proyectosDisponibles: proyectosDisponiblesData ?? [],
     proyectos: recaudoReal.proyectos,
     filasPorMes: recaudoReal.filasPorMes,
     totalesPorProyecto: recaudoReal.totalesPorProyecto,
@@ -419,5 +538,9 @@ export async function getReportes(anio: number): Promise<ReportesData> {
     totalVencidas,
     escrituradasPorProyecto,
     totalEscrituradas: escrituradasData?.length ?? 0,
+    lotesDisponibles,
+    totalLotesDisponibles: lotesDisponibles.length,
+    totalAreaLotesDisponibles,
+    totalValorLotesDisponibles,
   };
 }

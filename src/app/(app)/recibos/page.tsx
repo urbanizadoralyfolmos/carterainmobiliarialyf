@@ -13,15 +13,15 @@ function nombreProyecto(rel: ProyectoRel) {
 export default async function RecibosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ cuota?: string; q?: string }>;
+  searchParams: Promise<{ cuota?: string; proyecto?: string; q?: string }>;
 }) {
-  const { cuota, q } = await searchParams;
+  const { cuota, proyecto: proyectoFiltro, q } = await searchParams;
   const supabase = await createClient();
 
   let query = supabase
     .from("recibos")
     .select(
-      "*, cuotas(numero_cuota, contratos(numero, moneda, clientes(nombre, apellido, razon_social, tipo_persona, documento, nit), contrato_propiedades(propiedades(direccion, proyectos(nombre)))))"
+      "*, cuotas(numero_cuota, contratos(numero, moneda, clientes(nombre, apellido, razon_social, tipo_persona, documento, nit), contrato_propiedades(propiedades(direccion, proyecto_id, proyectos(nombre)))))"
     )
     .order("created_at", { ascending: false });
 
@@ -29,7 +29,10 @@ export default async function RecibosPage({
     query = query.eq("cuota_id", cuota);
   }
 
-  const { data: recibos, error } = await query;
+  const [{ data: recibos, error }, { data: proyectos }] = await Promise.all([
+    query,
+    supabase.from("proyectos").select("id, nombre").order("nombre"),
+  ]);
 
   const enriquecidos = (recibos ?? []).map((r) => {
     const c = r.cuotas;
@@ -43,7 +46,7 @@ export default async function RecibosPage({
         : "";
     const documento = cliente?.tipo_persona === "juridica" ? cliente?.nit : cliente?.documento;
     const propiedadesRel = (contrato?.contrato_propiedades ?? []) as {
-      propiedades: { direccion: string; proyectos?: ProyectoRel } | null;
+      propiedades: { direccion: string; proyecto_id: string | null; proyectos?: ProyectoRel } | null;
     }[];
     const propiedadesTexto = propiedadesRel
       .map((cp) => cp.propiedades?.direccion)
@@ -53,29 +56,53 @@ export default async function RecibosPage({
       .map((cp) => nombreProyecto(cp.propiedades?.proyectos))
       .filter(Boolean)
       .join(", ");
+    const proyectoIds = Array.from(
+      new Set(
+        propiedadesRel
+          .map((cp) => cp.propiedades?.proyecto_id)
+          .filter((v): v is string => Boolean(v))
+      )
+    );
     return {
       ...r,
       nombreCliente,
       documento,
       propiedadesTexto,
       proyectosTexto,
+      proyectoIds,
       numeroContrato: contrato?.numero,
     };
   });
 
   const termino = (q ?? "").trim().toLowerCase();
 
-  const filtrados = enriquecidos.filter((r) => {
-    if (!termino) return true;
-    return (
-      r.nombreCliente.toLowerCase().includes(termino) ||
-      (r.documento ?? "").toLowerCase().includes(termino) ||
-      r.propiedadesTexto.toLowerCase().includes(termino) ||
-      r.proyectosTexto.toLowerCase().includes(termino) ||
-      String(r.numeroContrato ?? "").includes(termino) ||
-      String(r.numero).includes(termino)
-    );
-  });
+  const filtrados = enriquecidos
+    .filter((r) => {
+      if (!proyectoFiltro) return true;
+      if (proyectoFiltro === "sin-proyecto") return r.proyectoIds.length === 0;
+      return r.proyectoIds.includes(proyectoFiltro);
+    })
+    .filter((r) => {
+      if (!termino) return true;
+      return (
+        r.nombreCliente.toLowerCase().includes(termino) ||
+        (r.documento ?? "").toLowerCase().includes(termino) ||
+        r.propiedadesTexto.toLowerCase().includes(termino) ||
+        r.proyectosTexto.toLowerCase().includes(termino) ||
+        String(r.numeroContrato ?? "").includes(termino) ||
+        String(r.numero).includes(termino)
+      );
+    });
+
+  const buildHref = (overrides: { proyecto?: string }) => {
+    const params = new URLSearchParams();
+    const proyectoValor = "proyecto" in overrides ? overrides.proyecto : proyectoFiltro;
+    if (cuota) params.set("cuota", cuota);
+    if (proyectoValor) params.set("proyecto", proyectoValor);
+    if (q) params.set("q", q);
+    const qs = params.toString();
+    return qs ? `/recibos?${qs}` : "/recibos";
+  };
 
   return (
     <div>
@@ -90,6 +117,40 @@ export default async function RecibosPage({
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <SearchInput placeholder="Buscar por cliente, documento, propiedad, proyecto, N.º de contrato o de recibo..." />
+      </div>
+
+      <div className="mt-2 flex flex-wrap gap-1">
+        <Link
+          href={buildHref({ proyecto: undefined })}
+          className={`rounded-md px-3 py-1.5 text-sm ${
+            !proyectoFiltro ? "bg-brand text-white" : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          Todos los proyectos
+        </Link>
+        <Link
+          href={buildHref({ proyecto: "sin-proyecto" })}
+          className={`rounded-md px-3 py-1.5 text-sm ${
+            proyectoFiltro === "sin-proyecto"
+              ? "bg-brand text-white"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          Sin proyecto
+        </Link>
+        {proyectos?.map((pr) => (
+          <Link
+            key={pr.id}
+            href={buildHref({ proyecto: pr.id })}
+            className={`rounded-md px-3 py-1.5 text-sm ${
+              proyectoFiltro === pr.id
+                ? "bg-brand text-white"
+                : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            {pr.nombre}
+          </Link>
+        ))}
       </div>
 
       {error && (

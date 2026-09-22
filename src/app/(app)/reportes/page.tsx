@@ -1,14 +1,30 @@
 import Link from "next/link";
 import { getReportes, type ReporteTipo } from "@/lib/reportes";
 import { formatMoney, formatDate } from "@/lib/utils/format";
+import { SelectorProyectoReportes } from "@/components/SelectorProyectoReportes";
 
-function DescargarReporte({ tipo, anio }: { tipo: ReporteTipo; anio: number }) {
+function DescargarReporte({
+  tipo,
+  anio,
+  proyecto,
+}: {
+  tipo: ReporteTipo;
+  anio: number;
+  proyecto?: string | null;
+}) {
+  const sufijo = proyecto ? `&proyecto=${proyecto}` : "";
   return (
     <div className="flex gap-2">
-      <a href={`/api/reportes/${tipo}/excel?anio=${anio}`} className="rounded-md border border-slate-300 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-100">
+      <a
+        href={`/api/reportes/${tipo}/excel?anio=${anio}${sufijo}`}
+        className="rounded-md border border-slate-300 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-100"
+      >
         Excel
       </a>
-      <a href={`/api/reportes/${tipo}/pdf?anio=${anio}`} className="rounded-md border border-slate-300 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-100">
+      <a
+        href={`/api/reportes/${tipo}/pdf?anio=${anio}${sufijo}`}
+        className="rounded-md border border-slate-300 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-100"
+      >
         PDF
       </a>
     </div>
@@ -18,23 +34,105 @@ function DescargarReporte({ tipo, anio }: { tipo: ReporteTipo; anio: number }) {
 export default async function ReportesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ anio?: string }>;
+  searchParams: Promise<{ anio?: string; proyecto?: string }>;
 }) {
-  const { anio: anioParam } = await searchParams;
+  const { anio: anioParam, proyecto: proyectoParam } = await searchParams;
 
   const anioActual = new Date().getFullYear();
   const anioParseado = anioParam ? Number(anioParam) : anioActual;
   const anio = Number.isFinite(anioParseado) && anioParseado > 2000 ? anioParseado : anioActual;
 
-  const data = await getReportes(anio);
+  const data = await getReportes(anio, proyectoParam);
 
   const aniosDisponibles = Array.from(
     new Set([anioActual, anioActual - 1, anioActual - 2, anioActual - 3, anio])
   ).sort((a, b) => b - a);
 
+  const hrefConAnio = (a: number) => {
+    const params = new URLSearchParams();
+    params.set("anio", String(a));
+    if (proyectoParam) params.set("proyecto", proyectoParam);
+    return `/reportes?${params.toString()}`;
+  };
+
   return (
     <div>
       <h1 className="text-lg font-semibold text-slate-900">Reportes</h1>
+
+      <SelectorProyectoReportes
+        anio={anio}
+        proyectoSeleccionado={data.proyectoSeleccionado}
+        proyectos={data.proyectosDisponibles}
+      />
+
+      {/* 0. Lotes disponibles para venta */}
+      <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-slate-900">
+            Lotes disponibles para venta ({data.totalLotesDisponibles})
+          </h2>
+          <DescargarReporte tipo="lotes-disponibles" anio={anio} proyecto={proyectoParam} />
+        </div>
+        <p className="mt-1 text-xs text-slate-400">
+          Lotes en estado &quot;disponible&quot;, con su área y valor de referencia.
+        </p>
+        <div className="mt-3 overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <thead className="text-left text-xs uppercase text-slate-500">
+              <tr>
+                <th className="whitespace-nowrap py-1 pr-3">Dirección</th>
+                <th className="whitespace-nowrap py-1 pr-3">Proyecto</th>
+                <th className="whitespace-nowrap py-1 pr-3">Manzana</th>
+                <th className="whitespace-nowrap py-1 pr-3">Lote</th>
+                <th className="whitespace-nowrap py-1 pr-3 text-right">Área (m²)</th>
+                <th className="whitespace-nowrap py-1 pr-3 text-right">Valor</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {data.lotesDisponibles.map((l) => (
+                <tr key={l.id}>
+                  <td className="py-1 pr-3 text-slate-700">
+                    <Link href={`/propiedades/${l.id}`} className="hover:underline">
+                      {l.direccion}
+                    </Link>
+                  </td>
+                  <td className="py-1 pr-3 text-slate-600">{l.proyecto}</td>
+                  <td className="py-1 pr-3 text-slate-600">{l.manzana ?? "-"}</td>
+                  <td className="py-1 pr-3 text-slate-600">{l.numero_lote ?? "-"}</td>
+                  <td className="py-1 pr-3 text-right text-slate-600">
+                    {l.superficie_m2 != null ? l.superficie_m2.toLocaleString("es-CO") : "-"}
+                  </td>
+                  <td className="py-1 pr-3 text-right font-medium text-slate-900">
+                    {l.valor_referencia != null ? formatMoney(l.valor_referencia) : "-"}
+                  </td>
+                </tr>
+              ))}
+              {data.lotesDisponibles.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="py-4 text-center text-slate-400">
+                    No hay lotes disponibles para este filtro.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+            {data.lotesDisponibles.length > 0 && (
+              <tfoot>
+                <tr className="border-t border-slate-200">
+                  <td className="py-1 pr-3 font-semibold text-slate-900" colSpan={4}>
+                    Total
+                  </td>
+                  <td className="py-1 pr-3 text-right font-semibold text-slate-900">
+                    {data.totalAreaLotesDisponibles.toLocaleString("es-CO")}
+                  </td>
+                  <td className="py-1 pr-3 text-right font-semibold text-amber-800">
+                    {formatMoney(data.totalValorLotesDisponibles)}
+                  </td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+      </div>
 
       {/* 1. Recaudo real por mes y proyecto */}
       <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
@@ -47,7 +145,7 @@ export default async function ReportesPage({
               {aniosDisponibles.map((a) => (
                 <Link
                   key={a}
-                  href={`/reportes?anio=${a}`}
+                  href={hrefConAnio(a)}
                   className={`rounded-md px-3 py-1 text-xs font-medium ${
                     a === anio
                       ? "bg-brand text-white"
@@ -58,7 +156,7 @@ export default async function ReportesPage({
                 </Link>
               ))}
             </div>
-            <DescargarReporte tipo="recaudo" anio={anio} />
+            <DescargarReporte tipo="recaudo" anio={anio} proyecto={proyectoParam} />
           </div>
         </div>
         <p className="mt-1 text-xs text-slate-400">
@@ -122,7 +220,7 @@ export default async function ReportesPage({
           <h2 className="text-sm font-semibold text-slate-900">
             Dinero recaudado esperado por mes y proyecto
           </h2>
-          <DescargarReporte tipo="recaudo-esperado" anio={anio} />
+          <DescargarReporte tipo="recaudo-esperado" anio={anio} proyecto={proyectoParam} />
         </div>
         <p className="mt-1 text-xs text-slate-400">
           Suma del monto de las cuotas según su fecha de vencimiento (sin importar si ya se
@@ -185,7 +283,7 @@ export default async function ReportesPage({
           <h2 className="text-sm font-semibold text-slate-900">
             Dinero recaudado esperado por año y proyecto
           </h2>
-          <DescargarReporte tipo="recaudo-esperado-por-anio" anio={anio} />
+          <DescargarReporte tipo="recaudo-esperado-por-anio" anio={anio} proyecto={proyectoParam} />
         </div>
         <p className="mt-1 text-xs text-slate-400">
           Igual que el reporte anterior pero sumado por año completo: incluye todos los años que
@@ -260,7 +358,7 @@ export default async function ReportesPage({
           <h2 className="text-sm font-semibold text-slate-900">
             Cuotas que vencen este mes ({data.cuotasVencenEsteMes.length})
           </h2>
-          <DescargarReporte tipo="vencen-este-mes" anio={anio} />
+          <DescargarReporte tipo="vencen-este-mes" anio={anio} proyecto={proyectoParam} />
         </div>
         <p className="mt-1 text-xs text-slate-400">
           Cuotas no pagadas con vencimiento entre hoy y fin de mes.
@@ -326,7 +424,7 @@ export default async function ReportesPage({
           <h2 className="text-sm font-semibold text-slate-900">
             Cuotas vencidas ({data.cuotasVencidas.length})
           </h2>
-          <DescargarReporte tipo="vencidas" anio={anio} />
+          <DescargarReporte tipo="vencidas" anio={anio} proyecto={proyectoParam} />
         </div>
         <p className="mt-1 text-xs text-slate-400">
           Cuotas no pagadas con fecha de vencimiento anterior a hoy, sin importar el mes.
@@ -394,7 +492,7 @@ export default async function ReportesPage({
           <h2 className="text-sm font-semibold text-slate-900">
             Lotes escriturados por proyecto ({data.totalEscrituradas})
           </h2>
-          <DescargarReporte tipo="escrituradas" anio={anio} />
+          <DescargarReporte tipo="escrituradas" anio={anio} proyecto={proyectoParam} />
         </div>
         <div className="mt-3 space-y-4">
           {data.escrituradasPorProyecto.map((grupo) => (
