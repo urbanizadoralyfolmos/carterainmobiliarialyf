@@ -4,7 +4,12 @@ import { createClient } from "@/lib/supabase/server";
 import { formatMoney } from "@/lib/utils/format";
 import { ProyectoForm } from "@/components/ProyectoForm";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
-import { actualizarProyecto, eliminarProyecto, generarLotes, eliminarManzana } from "../actions";
+import {
+  actualizarProyecto,
+  eliminarProyecto,
+  generarLotes,
+  eliminarManzana,
+} from "@/app/(app)/proyectos/actions";
 import { eliminarPropiedad, actualizarSuperficiePropiedad } from "@/app/(app)/propiedades/actions";
 import { esAdmin } from "@/lib/auth/rol";
 
