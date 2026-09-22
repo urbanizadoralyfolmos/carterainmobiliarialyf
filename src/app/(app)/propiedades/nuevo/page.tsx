@@ -12,7 +12,7 @@ export default async function NuevaPropiedadPage({
 
   const { data: proyectos } = await supabase
     .from("proyectos")
-    .select("id, nombre, valor_m2")
+    .select("id, nombre")
     .order("nombre");
 
   return (

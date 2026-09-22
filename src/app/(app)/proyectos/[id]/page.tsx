@@ -4,8 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { formatMoney } from "@/lib/utils/format";
 import { ProyectoForm } from "@/components/ProyectoForm";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
-import { actualizarProyecto, eliminarProyecto, generarLotes } from "../actions";
-import { actualizarSuperficiePropiedad } from "@/app/(app)/propiedades/actions";
+import { actualizarProyecto, eliminarProyecto, generarLotes, eliminarManzana } from "../actions";
+import { eliminarPropiedad } from "@/app/(app)/propiedades/actions";
 import { esAdmin } from "@/lib/auth/rol";
 
 const ESTADO_LABELS: Record<string, string> = {
@@ -116,10 +116,7 @@ export default async function ProyectoDetallePage({
           ) : (
             <div className="mt-2 max-w-2xl rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
               <p className="font-medium text-slate-900">{proyecto.nombre}</p>
-              <p className="mt-1 text-slate-500">
-                {proyecto.ciudad ?? "-"}
-                {proyecto.valor_m2 ? ` · Valor m²: ${formatMoney(proyecto.valor_m2)}` : ""}
-              </p>
+              <p className="mt-1 text-slate-500">{proyecto.ciudad ?? "-"}</p>
               {proyecto.descripcion && <p className="mt-2">{proyecto.descripcion}</p>}
               <p className="mt-3 text-xs text-slate-400">
                 No tienes permisos para editar o eliminar este proyecto. Consulta a un
@@ -135,7 +132,9 @@ export default async function ProyectoDetallePage({
             Crea varios lotes de una vez (por ejemplo 50, 100 o 200). Si el proyecto se
             organiza por manzanas, indica el número de manzana: el lote quedará numerado
             como MZLL (ej. manzana 01 + lote 01 = &quot;0101&quot;) y el conteo se reinicia
-            en 1 para cada manzana nueva.
+            en 1 para cada manzana nueva. La ciudad de los lotes es la del proyecto.
+            Después de crearlos, cualquier corrección de un lote puntual (dirección,
+            área, valor, etc.) se hace desde el módulo de Propiedades.
           </p>
           <form action={generarLotesConId} className="mt-3 grid grid-cols-2 gap-3">
             <div>
@@ -187,14 +186,6 @@ export default async function ProyectoDetallePage({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700">Ciudad</label>
-              <input
-                name="ciudad"
-                defaultValue={proyecto.ciudad ?? ""}
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
               <label className="block text-xs font-medium text-slate-700">
                 Superficie (m², opcional)
               </label>
@@ -207,24 +198,19 @@ export default async function ProyectoDetallePage({
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-700">
-                Valor de referencia (opcional)
+                Valor por m² (opcional)
               </label>
               <input
                 type="number"
                 step="0.01"
-                name="valor_referencia"
-                placeholder={
-                  proyecto.valor_m2
-                    ? `Se calcula solo: área × ${proyecto.valor_m2}`
-                    : "Ej: 45000000"
-                }
+                name="valor_m2"
+                placeholder="Ej: 150000"
                 className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
               />
-              {proyecto.valor_m2 && (
-                <p className="mt-1 text-xs text-slate-400">
-                  Déjalo vacío para que se calcule con el valor por m² del proyecto.
-                </p>
-              )}
+              <p className="mt-1 text-xs text-slate-400">
+                Es el valor de esta manzana. Si además indicas la superficie, el valor
+                total de cada lote se calcula solo (área × valor por m²).
+              </p>
             </div>
             <div className="col-span-2">
               <button
@@ -279,6 +265,17 @@ export default async function ProyectoDetallePage({
           </div>
         )}
 
+        {admin && manzanaFiltro && (
+          <form action={eliminarManzana.bind(null, id, manzanaFiltro)} className="mt-2">
+            <ConfirmSubmitButton
+              mensaje={`¿Eliminar la manzana ${manzanaFiltro} completa, junto con sus ${lotesFiltrados.length} lote(s)? Esta acción no se puede deshacer.`}
+              className="text-xs text-red-600 hover:text-red-800 hover:underline"
+            >
+              Eliminar manzana {manzanaFiltro} ({lotesFiltrados.length} lote(s))
+            </ConfirmSubmitButton>
+          </form>
+        )}
+
         <div className="mt-2 max-h-[32rem] overflow-y-auto rounded-lg border border-slate-200 bg-white">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead className="sticky top-0 bg-slate-50 text-left text-xs uppercase text-slate-500">
@@ -297,27 +294,7 @@ export default async function ProyectoDetallePage({
                   <td className="px-4 py-2 font-medium text-slate-900">{l.direccion}</td>
                   <td className="px-4 py-2 text-slate-600">{l.manzana ?? "-"}</td>
                   <td className="px-4 py-2 text-slate-600">
-                    {admin ? (
-                      <form
-                        action={actualizarSuperficiePropiedad.bind(null, l.id)}
-                        className="flex items-center gap-1"
-                      >
-                        <input type="hidden" name="redirect_to" value={redirectToLotes} />
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          name="superficie_m2"
-                          defaultValue={l.superficie_m2 ?? ""}
-                          className="w-20 rounded-md border border-slate-300 px-1.5 py-1 text-sm"
-                        />
-                        <button type="submit" className="text-xs text-brand hover:underline">
-                          Guardar
-                        </button>
-                      </form>
-                    ) : (
-                      <span>{l.superficie_m2 ? l.superficie_m2 : "-"}</span>
-                    )}
+                    {l.superficie_m2 ? l.superficie_m2 : "-"}
                   </td>
                   <td className="px-4 py-2 text-slate-600">
                     {l.valor_referencia ? formatMoney(l.valor_referencia) : "-"}
@@ -333,12 +310,26 @@ export default async function ProyectoDetallePage({
                   </td>
                   <td className="px-4 py-2 text-right">
                     {admin ? (
-                      <Link
-                        href={`/propiedades/${l.id}`}
-                        className="text-slate-600 hover:text-slate-900 hover:underline"
-                      >
-                        Editar
-                      </Link>
+                      <>
+                        <Link
+                          href={`/propiedades/${l.id}`}
+                          className="text-slate-600 hover:text-slate-900 hover:underline"
+                        >
+                          Editar
+                        </Link>
+                        <form
+                          action={eliminarPropiedad.bind(null, l.id)}
+                          className="ml-3 inline"
+                        >
+                          <input type="hidden" name="redirect_to" value={redirectToLotes} />
+                          <ConfirmSubmitButton
+                            mensaje={`¿Eliminar el lote "${l.direccion}"? Esta acción no se puede deshacer.`}
+                            className="text-red-600 hover:text-red-800 hover:underline"
+                          >
+                            Eliminar
+                          </ConfirmSubmitButton>
+                        </form>
+                      </>
                     ) : (
                       <span className="text-xs text-slate-400">-</span>
                     )}

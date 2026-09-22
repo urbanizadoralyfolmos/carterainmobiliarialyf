@@ -42,7 +42,7 @@ export default async function EditarPropiedadPage({
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    supabase.from("proyectos").select("id, nombre, valor_m2").order("nombre"),
+    supabase.from("proyectos").select("id, nombre").order("nombre"),
   ]);
 
   const contratoVinculadoRel = vinculo?.contratos as

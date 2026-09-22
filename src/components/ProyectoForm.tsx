@@ -29,22 +29,6 @@ export function ProyectoForm({
           className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
         />
       </div>
-      <div>
-        <label className="block text-sm font-medium text-slate-700">
-          Valor de referencia por m² (COP)
-        </label>
-        <input
-          type="number"
-          step="0.01"
-          name="valor_m2"
-          defaultValue={proyecto?.valor_m2 ?? ""}
-          placeholder="Ej: 150000"
-          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-        />
-        <p className="mt-1 text-xs text-slate-400">
-          Si lo defines, el valor de cada lote se calcula solo (área × este valor).
-        </p>
-      </div>
       <div className="col-span-2">
         <label className="block text-sm font-medium text-slate-700">Descripción</label>
         <textarea

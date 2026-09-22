@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { formatMoney } from "@/lib/utils/format";
 import { esAdmin } from "@/lib/auth/rol";
 
 export default async function ProyectosPage() {
@@ -44,7 +43,6 @@ export default async function ProyectosPage() {
             <tr>
               <th className="px-4 py-2">Nombre</th>
               <th className="px-4 py-2">Ciudad</th>
-              <th className="px-4 py-2">Valor m²</th>
               <th className="px-4 py-2">Lotes</th>
               <th className="px-4 py-2">Disponibles</th>
               <th className="px-4 py-2 text-right">Acciones</th>
@@ -61,9 +59,6 @@ export default async function ProyectosPage() {
                     </Link>
                   </td>
                   <td className="px-4 py-2 text-slate-600">{p.ciudad ?? "-"}</td>
-                  <td className="px-4 py-2 text-slate-600">
-                    {p.valor_m2 ? formatMoney(p.valor_m2) : "-"}
-                  </td>
                   <td className="px-4 py-2 text-slate-600">{conteo.total}</td>
                   <td className="px-4 py-2 text-slate-600">{conteo.disponibles}</td>
                   <td className="px-4 py-2 text-right">
@@ -85,7 +80,7 @@ export default async function ProyectosPage() {
             })}
             {proyectos?.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-slate-400">
+                <td colSpan={5} className="px-4 py-6 text-center text-slate-400">
                   Todavía no hay proyectos cargados.
                 </td>
               </tr>

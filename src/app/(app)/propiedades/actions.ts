@@ -18,6 +18,7 @@ function readPropiedadForm(formData: FormData) {
     superficie_m2: formData.get("superficie_m2")
       ? Number(formData.get("superficie_m2"))
       : null,
+    valor_m2: formData.get("valor_m2") ? Number(formData.get("valor_m2")) : null,
     valor_referencia: formData.get("valor_referencia")
       ? Number(formData.get("valor_referencia"))
       : null,
@@ -112,36 +113,3 @@ export async function eliminarPropiedades(formData: FormData) {
   redirect(redirectTo);
 }
 
-/**
- * Actualiza solo la superficie (m²) de una propiedad desde una lista (la de
- * Propiedades o la de Lotes dentro de un Proyecto), sin necesidad de entrar
- * a la página de edición completa del lote. No toca ningún otro campo.
- * `redirect_to` permite volver a la página/filtro desde donde se llamó si
- * algo sale mal (por defecto, la lista de Propiedades).
- */
-export async function actualizarSuperficiePropiedad(id: string, formData: FormData) {
-  const redirectTo = String(formData.get("redirect_to") ?? "").trim() || "/propiedades";
-  await requireAdmin(redirectTo);
-  const supabase = await createClient();
-  const raw = formData.get("superficie_m2");
-  const texto = String(raw ?? "").trim();
-  const superficie_m2 = texto === "" ? null : Number(texto);
-
-  if (superficie_m2 !== null && (Number.isNaN(superficie_m2) || superficie_m2 < 0)) {
-    redirect(
-      `${redirectTo}?error=${encodeURIComponent("La superficie debe ser un número válido.")}`
-    );
-  }
-
-  const { error } = await supabase
-    .from("propiedades")
-    .update({ superficie_m2 })
-    .eq("id", id);
-
-  if (error) {
-    redirect(`${redirectTo}?error=${encodeURIComponent(error.message)}`);
-  }
-
-  revalidatePath("/propiedades");
-  revalidatePath("/proyectos", "layout");
-}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import type { Propiedad, Proyecto } from "@/lib/types";
 
 const ESTADO_LABELS: Record<string, string> = {
@@ -18,7 +18,7 @@ export function PropiedadForm({
   error,
 }: {
   propiedad?: Partial<Propiedad>;
-  proyectos?: Pick<Proyecto, "id" | "nombre" | "valor_m2">[];
+  proyectos?: Pick<Proyecto, "id" | "nombre">[];
   contratoVinculado?: { numero: number; estado: string } | null;
   action: (formData: FormData) => void;
   error?: string;
@@ -27,21 +27,31 @@ export function PropiedadForm({
   const [superficie, setSuperficie] = useState(
     propiedad?.superficie_m2 != null ? String(propiedad.superficie_m2) : ""
   );
-  const [valor, setValor] = useState(
+  const [valorM2, setValorM2] = useState(
+    propiedad?.valor_m2 != null ? String(propiedad.valor_m2) : ""
+  );
+  const [valorManual, setValorManual] = useState(
     propiedad?.valor_referencia != null ? String(propiedad.valor_referencia) : ""
   );
   const [valorAuto, setValorAuto] = useState(!propiedad?.valor_referencia);
 
-  const proyectoSeleccionado = proyectos?.find((p) => p.id === proyectoId);
-
-  useEffect(() => {
-    if (!valorAuto) return;
+  // Mientras no se escriba un valor manual, el valor de referencia se
+  // deriva del área y el valor por m² (no hace falta un efecto: es un
+  // cálculo directo a partir del estado actual).
+  const valorCalculado = useMemo(() => {
     const area = parseFloat(superficie);
-    if (proyectoSeleccionado?.valor_m2 && area > 0) {
-      const calculado = Math.round(area * proyectoSeleccionado.valor_m2 * 100) / 100;
-      setValor(String(calculado));
+    const porM2 = parseFloat(valorM2);
+    if (porM2 > 0 && area > 0) {
+      return String(Math.round(area * porM2 * 100) / 100);
     }
-  }, [proyectoId, superficie, valorAuto, proyectoSeleccionado]);
+    return "";
+  }, [superficie, valorM2]);
+
+  const valor = valorAuto ? valorCalculado : valorManual;
+  const setValor = (v: string) => {
+    setValorManual(v);
+    setValorAuto(v === "");
+  };
 
   return (
     <form action={action} className="mt-4 grid max-w-2xl grid-cols-2 gap-4">
@@ -126,22 +136,35 @@ export function PropiedadForm({
         />
       </div>
       <div>
+        <label className="block text-sm font-medium text-slate-700">Valor por m² (COP)</label>
+        <input
+          type="number"
+          step="0.01"
+          name="valor_m2"
+          value={valorM2}
+          onChange={(e) => setValorM2(e.target.value)}
+          placeholder="Ej: 150000"
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+        />
+        <p className="mt-1 text-xs text-slate-400">
+          Es el valor asignado a la manzana de este lote (se define al generar los lotes).
+          Si lo cambias aquí, el valor de referencia se recalcula solo.
+        </p>
+      </div>
+      <div>
         <label className="block text-sm font-medium text-slate-700">Valor de referencia</label>
         <input
           type="number"
           step="0.01"
           name="valor_referencia"
           value={valor}
-          onChange={(e) => {
-            setValor(e.target.value);
-            setValorAuto(e.target.value === "");
-          }}
+          onChange={(e) => setValor(e.target.value)}
           className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
         />
-        {valorAuto && proyectoSeleccionado?.valor_m2 && (
+        {valorAuto && parseFloat(valorM2) > 0 && (
           <p className="mt-1 text-xs text-slate-400">
-            Calculado solo: área × {proyectoSeleccionado.valor_m2} (valor por m² del
-            proyecto). Puedes escribir un valor distinto si lo necesitas.
+            Calculado solo: área × {valorM2} (valor por m²). Puedes escribir un valor
+            distinto si lo necesitas.
           </p>
         )}
       </div>

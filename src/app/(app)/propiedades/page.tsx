@@ -52,7 +52,7 @@ export default async function PropiedadesPage({
         .from("contrato_propiedades")
         .select("propiedad_id, contratos(numero, estado, numero_factura, created_at)")
         .order("created_at", { ascending: false }),
-      supabase.from("proyectos").select("id, nombre, valor_m2").order("nombre"),
+      supabase.from("proyectos").select("id, nombre").order("nombre"),
     ]);
 
   type ContratoRelPropiedad = {

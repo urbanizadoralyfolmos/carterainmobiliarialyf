@@ -10,7 +10,6 @@ function readProyectoForm(formData: FormData) {
     nombre: String(formData.get("nombre") ?? "").trim(),
     ciudad: String(formData.get("ciudad") ?? "").trim() || null,
     descripcion: String(formData.get("descripcion") ?? "").trim() || null,
-    valor_m2: formData.get("valor_m2") ? Number(formData.get("valor_m2")) : null,
   };
 }
 
@@ -91,30 +90,29 @@ export async function generarLotes(proyectoId: string, formData: FormData) {
   const desde = Math.max(1, Number(formData.get("desde") ?? 1));
   const manzana = String(formData.get("manzana") ?? "").trim();
   const prefijo = String(formData.get("prefijo") ?? "Lote").trim() || "Lote";
-  const ciudad = String(formData.get("ciudad") ?? "").trim() || null;
   const superficie = formData.get("superficie_m2")
     ? Number(formData.get("superficie_m2"))
     : null;
-  let valor = formData.get("valor_referencia")
-    ? Number(formData.get("valor_referencia"))
-    : null;
+  const valorM2 = formData.get("valor_m2") ? Number(formData.get("valor_m2")) : null;
 
   if (!cantidad) {
     redirect(`/proyectos/${proyectoId}?error=${encodeURIComponent("Indicá una cantidad de lotes válida")}`);
   }
 
-  // Si no se indicó un valor manual, se calcula solo con el valor por m²
-  // configurado en el proyecto (valor = área × valor por m²).
-  if (valor === null && superficie) {
-    const { data: proyectoValor } = await supabase
-      .from("proyectos")
-      .select("valor_m2")
-      .eq("id", proyectoId)
-      .single();
-    if (proyectoValor?.valor_m2) {
-      valor = Math.round(superficie * proyectoValor.valor_m2 * 100) / 100;
-    }
-  }
+  // La ciudad de los lotes es siempre la del proyecto (ya no se pide en
+  // este formulario). El valor por m² se asigna aquí, a nivel de manzana:
+  // si además se indica la superficie, el valor total del lote se calcula
+  // solo (superficie × valor por m²). Ese valor por m² queda guardado en
+  // cada lote para que, si más adelante se corrige el área desde el
+  // módulo de Propiedades, el valor total se recalcule automáticamente.
+  const { data: proyectoDatos } = await supabase
+    .from("proyectos")
+    .select("ciudad")
+    .eq("id", proyectoId)
+    .single();
+  const ciudad = proyectoDatos?.ciudad ?? null;
+
+  const valor = superficie && valorM2 ? Math.round(superficie * valorM2 * 100) / 100 : null;
 
   // Si se indica una manzana, el número de lote queda compuesto: MMLL
   // (ej. manzana 01 + lote 01 = "0101"). El conteo de lotes se reinicia
@@ -137,6 +135,7 @@ export async function generarLotes(proyectoId: string, formData: FormData) {
         tipo: "lote",
         estado: "disponible",
         superficie_m2: superficie,
+        valor_m2: valorM2,
         valor_referencia: valor,
       };
     }
@@ -150,6 +149,7 @@ export async function generarLotes(proyectoId: string, formData: FormData) {
       tipo: "lote",
       estado: "disponible",
       superficie_m2: superficie,
+      valor_m2: valorM2,
       valor_referencia: valor,
     };
   });
@@ -157,6 +157,36 @@ export async function generarLotes(proyectoId: string, formData: FormData) {
   const { error } = await supabase.from("propiedades").insert(lotes);
   if (error) {
     redirect(`/proyectos/${proyectoId}?error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath("/propiedades");
+  revalidatePath(`/proyectos/${proyectoId}`);
+  redirect(`/proyectos/${proyectoId}`);
+}
+
+/**
+ * Elimina de una sola vez todos los lotes de una manzana dentro de un
+ * proyecto (por ejemplo si se generó con datos equivocados). Si alguno de
+ * esos lotes ya tiene un contrato asociado, la base de datos bloquea el
+ * borrado de todos (no se permite borrar una propiedad con contratos
+ * vigentes) para no dejar la manzana a medias.
+ */
+export async function eliminarManzana(proyectoId: string, manzana: string) {
+  await requireAdmin(`/proyectos/${proyectoId}`);
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("propiedades")
+    .delete()
+    .eq("proyecto_id", proyectoId)
+    .eq("manzana", manzana);
+
+  if (error) {
+    redirect(
+      `/proyectos/${proyectoId}?error=${encodeURIComponent(
+        "No se pudo eliminar la manzana: alguno de sus lotes tiene un contrato asociado. Elimina o reasigna esos contratos primero."
+      )}`
+    );
   }
 
   revalidatePath("/propiedades");

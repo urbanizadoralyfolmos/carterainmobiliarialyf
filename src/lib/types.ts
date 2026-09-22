@@ -35,6 +35,7 @@ export type Propiedad = {
   numero_escritura: string | null;
   fecha_escritura: string | null;
   numero_factura: string | null;
+  valor_m2: number | null;
   descripcion: string | null;
   proyecto_id: string | null;
   numero_lote: string | null;
