@@ -104,12 +104,6 @@ export default async function PropiedadesPage({
     <div>
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-slate-900">Propiedades</h1>
-        <Link
-          href="/propiedades/nuevo"
-          className="rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-dark"
-        >
-          + Nueva propiedad
-        </Link>
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -306,14 +300,3 @@ export default async function PropiedadesPage({
                   <tr>
                     <td colSpan={admin ? 10 : 9} className="px-4 py-6 text-center text-slate-400">
                       Todavía no hay propiedades cargadas.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </form>
-    </div>
-  );
-}
