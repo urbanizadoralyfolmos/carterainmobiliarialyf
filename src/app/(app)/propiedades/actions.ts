@@ -113,3 +113,54 @@ export async function eliminarPropiedades(formData: FormData) {
   redirect(redirectTo);
 }
 
+/**
+ * Actualiza solo la superficie (m²) de una propiedad desde una lista (la de
+ * Lotes dentro de un Proyecto, justo después de generarlos), sin necesidad
+ * de entrar a la página de edición completa del lote. Como los lotes de una
+ * misma manzana suelen tener áreas distintas, esto permite escribirlas una
+ * por una en el listado.
+ *
+ * Si el lote tiene un valor por m² asignado (el que se definió al crear la
+ * manzana), el valor de referencia se recalcula solo (área × valor por m²).
+ * Si no tiene valor por m² asignado, el valor de referencia no se toca.
+ *
+ * `redirect_to` permite volver a la página/filtro desde donde se llamó si
+ * algo sale mal (por defecto, la lista de Propiedades).
+ */
+export async function actualizarSuperficiePropiedad(id: string, formData: FormData) {
+  const redirectTo = String(formData.get("redirect_to") ?? "").trim() || "/propiedades";
+  await requireAdmin(redirectTo);
+  const supabase = await createClient();
+  const raw = formData.get("superficie_m2");
+  const texto = String(raw ?? "").trim();
+  const superficie_m2 = texto === "" ? null : Number(texto);
+
+  if (superficie_m2 !== null && (Number.isNaN(superficie_m2) || superficie_m2 < 0)) {
+    redirect(
+      `${redirectTo}?error=${encodeURIComponent("La superficie debe ser un número válido.")}`
+    );
+  }
+
+  const { data: propiedad } = await supabase
+    .from("propiedades")
+    .select("valor_m2")
+    .eq("id", id)
+    .single();
+
+  const update: { superficie_m2: number | null; valor_referencia?: number } = {
+    superficie_m2,
+  };
+  if (propiedad?.valor_m2 && superficie_m2 !== null) {
+    update.valor_referencia = Math.round(superficie_m2 * propiedad.valor_m2 * 100) / 100;
+  }
+
+  const { error } = await supabase.from("propiedades").update(update).eq("id", id);
+
+  if (error) {
+    redirect(`${redirectTo}?error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath("/propiedades");
+  revalidatePath("/proyectos", "layout");
+}
+

@@ -5,7 +5,7 @@ import { formatMoney } from "@/lib/utils/format";
 import { ProyectoForm } from "@/components/ProyectoForm";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { actualizarProyecto, eliminarProyecto, generarLotes, eliminarManzana } from "../actions";
-import { eliminarPropiedad } from "@/app/(app)/propiedades/actions";
+import { eliminarPropiedad, actualizarSuperficiePropiedad } from "@/app/(app)/propiedades/actions";
 import { esAdmin } from "@/lib/auth/rol";
 
 const ESTADO_LABELS: Record<string, string> = {
@@ -132,9 +132,12 @@ export default async function ProyectoDetallePage({
             Crea varios lotes de una vez (por ejemplo 50, 100 o 200). Si el proyecto se
             organiza por manzanas, indica el número de manzana: el lote quedará numerado
             como MZLL (ej. manzana 01 + lote 01 = &quot;0101&quot;) y el conteo se reinicia
-            en 1 para cada manzana nueva. La ciudad de los lotes es la del proyecto.
-            Después de crearlos, cualquier corrección de un lote puntual (dirección,
-            área, valor, etc.) se hace desde el módulo de Propiedades.
+            en 1 para cada manzana nueva. La ciudad de los lotes es la del proyecto. Como
+            los lotes de una misma manzana suelen tener áreas distintas, normalmente
+            conviene dejar la superficie en blanco aquí e ir escribiendo el área de cada
+            lote en el listado de abajo: el valor total se calcula solo (área × valor por
+            m² de la manzana). Cualquier otra corrección (dirección, tipo, etc.) se hace
+            desde el módulo de Propiedades.
           </p>
           <form action={generarLotesConId} className="mt-3 grid grid-cols-2 gap-3">
             <div>
@@ -294,7 +297,28 @@ export default async function ProyectoDetallePage({
                   <td className="px-4 py-2 font-medium text-slate-900">{l.direccion}</td>
                   <td className="px-4 py-2 text-slate-600">{l.manzana ?? "-"}</td>
                   <td className="px-4 py-2 text-slate-600">
-                    {l.superficie_m2 ? l.superficie_m2 : "-"}
+                    {admin ? (
+                      <form
+                        action={actualizarSuperficiePropiedad.bind(null, l.id)}
+                        className="flex items-center gap-1"
+                      >
+                        <input type="hidden" name="redirect_to" value={redirectToLotes} />
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          name="superficie_m2"
+                          defaultValue={l.superficie_m2 ?? ""}
+                          placeholder="m²"
+                          className="w-20 rounded-md border border-slate-300 px-1.5 py-1 text-sm"
+                        />
+                        <button type="submit" className="text-xs text-brand hover:underline">
+                          Guardar
+                        </button>
+                      </form>
+                    ) : (
+                      <span>{l.superficie_m2 ? l.superficie_m2 : "-"}</span>
+                    )}
                   </td>
                   <td className="px-4 py-2 text-slate-600">
                     {l.valor_referencia ? formatMoney(l.valor_referencia) : "-"}
