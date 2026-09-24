@@ -52,6 +52,12 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 3,
   },
+  colDireccionLote: { width: "34%" },
+  colProyectoLote: { width: "22%" },
+  colManzanaLote: { width: "12%" },
+  colLoteLote: { width: "12%" },
+  colAreaLote: { width: "10%" },
+  colValorLote: { width: "10%" },
 });
 
 function TablaRecaudo({
@@ -181,8 +187,9 @@ export async function GET(
   const anioActual = new Date().getFullYear();
   const anioParseado = anioParam ? Number(anioParam) : anioActual;
   const anio = Number.isFinite(anioParseado) && anioParseado > 2000 ? anioParseado : anioActual;
+  const proyectoParam = req.nextUrl.searchParams.get("proyecto");
 
-  const data = await getReportes(anio);
+  const data = await getReportes(anio, proyectoParam);
   const generado = formatDate(new Date().toISOString().slice(0, 10));
 
   let doc: ReactElement<ComponentProps<typeof Document>>;
@@ -322,7 +329,7 @@ export async function GET(
         </Page>
       </Document>
     );
-  } else {
+  } else if (reporteTipo === "escrituradas") {
     doc = (
       <Document>
         <Page size="A4" style={styles.page}>
@@ -359,6 +366,54 @@ export async function GET(
             ))
           ) : (
             <Text style={styles.td}>Todavía no hay lotes escriturados.</Text>
+          )}
+        </Page>
+      </Document>
+    );
+  } else {
+    // reporteTipo === "lotes-disponibles"
+    doc = (
+      <Document>
+        <Page size="A4" style={styles.page}>
+          <Text style={styles.title}>Lotes disponibles para venta</Text>
+          <Text style={styles.subtitle}>Generado el {generado}</Text>
+
+          {data.lotesDisponibles.length > 0 ? (
+            <View style={styles.table}>
+              <View style={styles.tableHeaderRow}>
+                <Text style={[styles.th, styles.colDireccionLote]}>Dirección</Text>
+                <Text style={[styles.th, styles.colProyectoLote]}>Proyecto</Text>
+                <Text style={[styles.th, styles.colManzanaLote]}>Manzana</Text>
+                <Text style={[styles.th, styles.colLoteLote]}>Lote</Text>
+                <Text style={[styles.th, styles.colAreaLote]}>Área (m²)</Text>
+                <Text style={[styles.th, styles.colValorLote]}>Valor</Text>
+              </View>
+              {data.lotesDisponibles.map((l) => (
+                <View style={styles.tableRow} key={l.id}>
+                  <Text style={[styles.td, styles.colDireccionLote]}>{l.direccion}</Text>
+                  <Text style={[styles.td, styles.colProyectoLote]}>{l.proyecto}</Text>
+                  <Text style={[styles.td, styles.colManzanaLote]}>{l.manzana ?? "-"}</Text>
+                  <Text style={[styles.td, styles.colLoteLote]}>{l.numero_lote ?? "-"}</Text>
+                  <Text style={[styles.td, styles.colAreaLote]}>
+                    {l.superficie_m2 != null ? l.superficie_m2.toLocaleString("es-CO") : "-"}
+                  </Text>
+                  <Text style={[styles.td, styles.colValorLote]}>
+                    {l.valor_referencia != null ? formatMoney(l.valor_referencia) : "-"}
+                  </Text>
+                </View>
+              ))}
+              <View style={styles.totalRow}>
+                <Text style={[styles.totalLabel, { width: "80%" }]}>Total</Text>
+                <Text style={[styles.totalValue, styles.colAreaLote]}>
+                  {data.totalAreaLotesDisponibles.toLocaleString("es-CO")}
+                </Text>
+                <Text style={[styles.totalValue, styles.colValorLote]}>
+                  {formatMoney(data.totalValorLotesDisponibles)}
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <Text style={styles.td}>No hay lotes disponibles para este filtro.</Text>
           )}
         </Page>
       </Document>
