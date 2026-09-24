@@ -37,14 +37,15 @@ const styles = StyleSheet.create({
   colMes: { width: "16%" },
   colProyecto: { flex: 1 },
   colTotal: { width: "16%" },
-  colCliente: { width: "20%" },
-  colPropiedad: { width: "20%" },
-  colProyectoCuota: { width: "18%" },
-  colContrato: { width: "10%" },
-  colCuota: { width: "9%" },
-  colFecha: { width: "12%" },
-  colDias: { width: "9%" },
-  colSaldo: { width: "13%" },
+  colCliente: { width: "16%" },
+  colContacto: { width: "16%" },
+  colPropiedad: { width: "16%" },
+  colProyectoCuota: { width: "14%" },
+  colContrato: { width: "9%" },
+  colCuota: { width: "8%" },
+  colFecha: { width: "11%" },
+  colDias: { width: "8%" },
+  colSaldo: { width: "12%" },
   sectionSubtitle: {
     fontSize: 8,
     fontWeight: "bold",
@@ -246,6 +247,7 @@ export async function GET(
             <View style={styles.table}>
               <View style={styles.tableHeaderRow}>
                 <Text style={[styles.th, styles.colCliente]}>Cliente</Text>
+                <Text style={[styles.th, styles.colContacto]}>Contacto</Text>
                 <Text style={[styles.th, styles.colPropiedad]}>Propiedad</Text>
                 <Text style={[styles.th, styles.colProyectoCuota]}>Proyecto</Text>
                 <Text style={[styles.th, styles.colContrato]}>Contrato</Text>
@@ -256,6 +258,7 @@ export async function GET(
               {data.cuotasVencenEsteMes.map((c) => (
                 <View style={styles.tableRow} key={c.id}>
                   <Text style={[styles.td, styles.colCliente]}>{c.nombreCliente}</Text>
+                  <Text style={[styles.td, styles.colContacto]}>{c.contactoCliente || "-"}</Text>
                   <Text style={[styles.td, styles.colPropiedad]}>{c.propiedadesTexto || "-"}</Text>
                   <Text style={[styles.td, styles.colProyectoCuota]}>{c.proyectoTexto}</Text>
                   <Text style={[styles.td, styles.colContrato]}>
@@ -269,7 +272,7 @@ export async function GET(
                 </View>
               ))}
               <View style={styles.totalRow}>
-                <Text style={[styles.totalLabel, { width: "89%" }]}>Total</Text>
+                <Text style={[styles.totalLabel, { width: "90%" }]}>Total</Text>
                 <Text style={[styles.totalValue, styles.colSaldo]}>
                   {formatMoney(data.totalVencenEsteMes)}
                 </Text>
@@ -292,6 +295,7 @@ export async function GET(
             <View style={styles.table}>
               <View style={styles.tableHeaderRow}>
                 <Text style={[styles.th, styles.colCliente]}>Cliente</Text>
+                <Text style={[styles.th, styles.colContacto]}>Contacto</Text>
                 <Text style={[styles.th, styles.colPropiedad]}>Propiedad</Text>
                 <Text style={[styles.th, styles.colProyectoCuota]}>Proyecto</Text>
                 <Text style={[styles.th, styles.colContrato]}>Contrato</Text>
@@ -303,6 +307,7 @@ export async function GET(
               {data.cuotasVencidas.map((c) => (
                 <View style={styles.tableRow} key={c.id}>
                   <Text style={[styles.td, styles.colCliente]}>{c.nombreCliente}</Text>
+                  <Text style={[styles.td, styles.colContacto]}>{c.contactoCliente || "-"}</Text>
                   <Text style={[styles.td, styles.colPropiedad]}>{c.propiedadesTexto || "-"}</Text>
                   <Text style={[styles.td, styles.colProyectoCuota]}>{c.proyectoTexto}</Text>
                   <Text style={[styles.td, styles.colContrato]}>
@@ -317,7 +322,7 @@ export async function GET(
                 </View>
               ))}
               <View style={styles.totalRow}>
-                <Text style={[styles.totalLabel, { width: "79%" }]}>Total</Text>
+                <Text style={[styles.totalLabel, { width: "98%" }]}>Total</Text>
                 <Text style={[styles.totalValue, styles.colSaldo]}>
                   {formatMoney(data.totalVencidas)}
                 </Text>

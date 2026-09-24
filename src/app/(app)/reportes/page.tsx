@@ -391,6 +391,7 @@ export default async function ReportesPage({
             <thead className="text-left text-xs uppercase text-slate-500">
               <tr>
                 <th className="whitespace-nowrap py-1 pr-3">Cliente</th>
+                <th className="whitespace-nowrap py-1 pr-3">Contacto</th>
                 <th className="whitespace-nowrap py-1 pr-3">Propiedad</th>
                 <th className="whitespace-nowrap py-1 pr-3">Proyecto</th>
                 <th className="whitespace-nowrap py-1 pr-3">Contrato</th>
@@ -403,6 +404,7 @@ export default async function ReportesPage({
               {data.cuotasVencenEsteMes.map((c) => (
                 <tr key={c.id}>
                   <td className="py-1 pr-3 font-medium text-slate-900">{c.nombreCliente}</td>
+                  <td className="py-1 pr-3 text-slate-600">{c.contactoCliente || "-"}</td>
                   <td className="py-1 pr-3 text-slate-600">{c.propiedadesTexto || "-"}</td>
                   <td className="py-1 pr-3 text-slate-600">{c.proyectoTexto}</td>
                   <td className="py-1 pr-3 text-slate-600">
@@ -419,7 +421,7 @@ export default async function ReportesPage({
               ))}
               {data.cuotasVencenEsteMes.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="py-4 text-center text-slate-400">
+                  <td colSpan={8} className="py-4 text-center text-slate-400">
                     No hay cuotas por vencer en lo que queda del mes.
                   </td>
                 </tr>
@@ -428,7 +430,7 @@ export default async function ReportesPage({
             {data.cuotasVencenEsteMes.length > 0 && (
               <tfoot>
                 <tr className="border-t border-slate-200">
-                  <td className="py-1 pr-3 font-semibold text-slate-900" colSpan={6}>
+                  <td className="py-1 pr-3 font-semibold text-slate-900" colSpan={7}>
                     Total
                   </td>
                   <td className="py-1 pr-3 text-right font-semibold text-slate-900">
@@ -457,6 +459,7 @@ export default async function ReportesPage({
             <thead className="text-left text-xs uppercase text-slate-500">
               <tr>
                 <th className="whitespace-nowrap py-1 pr-3">Cliente</th>
+                <th className="whitespace-nowrap py-1 pr-3">Contacto</th>
                 <th className="whitespace-nowrap py-1 pr-3">Propiedad</th>
                 <th className="whitespace-nowrap py-1 pr-3">Proyecto</th>
                 <th className="whitespace-nowrap py-1 pr-3">Contrato</th>
@@ -470,6 +473,7 @@ export default async function ReportesPage({
               {data.cuotasVencidas.map((c) => (
                 <tr key={c.id} className="bg-red-50/40">
                   <td className="py-1 pr-3 font-medium text-slate-900">{c.nombreCliente}</td>
+                  <td className="py-1 pr-3 text-slate-600">{c.contactoCliente || "-"}</td>
                   <td className="py-1 pr-3 text-slate-600">{c.propiedadesTexto || "-"}</td>
                   <td className="py-1 pr-3 text-slate-600">{c.proyectoTexto}</td>
                   <td className="py-1 pr-3 text-slate-600">
@@ -487,7 +491,7 @@ export default async function ReportesPage({
               ))}
               {data.cuotasVencidas.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="py-4 text-center text-slate-400">
+                  <td colSpan={9} className="py-4 text-center text-slate-400">
                     No hay cuotas vencidas. 🎉
                   </td>
                 </tr>
@@ -496,7 +500,7 @@ export default async function ReportesPage({
             {data.cuotasVencidas.length > 0 && (
               <tfoot>
                 <tr className="border-t border-slate-200">
-                  <td className="py-1 pr-3 font-semibold text-slate-900" colSpan={7}>
+                  <td className="py-1 pr-3 font-semibold text-slate-900" colSpan={8}>
                     Total
                   </td>
                   <td className="py-1 pr-3 text-right font-semibold text-amber-800">

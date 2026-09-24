@@ -162,6 +162,7 @@ export async function GET(
     const sheet = workbook.addWorksheet("Vencen este mes");
     sheet.columns = [
       { width: 28 },
+      { width: 26 },
       { width: 30 },
       { width: 22 },
       { width: 12 },
@@ -169,32 +170,43 @@ export async function GET(
       { width: 14 },
       { width: 16 },
     ];
-    const headers = ["Cliente", "Propiedad", "Proyecto", "Contrato", "Cuota", "Vencimiento", "Saldo"];
+    const headers = [
+      "Cliente",
+      "Contacto",
+      "Propiedad",
+      "Proyecto",
+      "Contrato",
+      "Cuota",
+      "Vencimiento",
+      "Saldo",
+    ];
     const headerRow = sheet.getRow(1);
     headers.forEach((h, i) => headerCell(headerRow.getCell(i + 1), h));
     data.cuotasVencenEsteMes.forEach((c, idx) => {
       const row = sheet.getRow(idx + 2);
       row.getCell(1).value = c.nombreCliente;
-      row.getCell(2).value = c.propiedadesTexto || "-";
-      row.getCell(3).value = c.proyectoTexto;
-      row.getCell(4).value = c.numeroContrato ? `N.º ${c.numeroContrato}` : "-";
-      row.getCell(5).value = c.numero_cuota === 0 ? "Inicial" : `#${c.numero_cuota}`;
-      row.getCell(6).value = formatDate(c.fecha_vencimiento);
-      row.getCell(7).value = c.saldo;
-      row.getCell(7).numFmt = "#,##0";
+      row.getCell(2).value = c.contactoCliente || "-";
+      row.getCell(3).value = c.propiedadesTexto || "-";
+      row.getCell(4).value = c.proyectoTexto;
+      row.getCell(5).value = c.numeroContrato ? `N.º ${c.numeroContrato}` : "-";
+      row.getCell(6).value = c.numero_cuota === 0 ? "Inicial" : `#${c.numero_cuota}`;
+      row.getCell(7).value = formatDate(c.fecha_vencimiento);
+      row.getCell(8).value = c.saldo;
+      row.getCell(8).numFmt = "#,##0";
     });
     if (data.cuotasVencenEsteMes.length > 0) {
       const totalRow = sheet.getRow(data.cuotasVencenEsteMes.length + 2);
-      totalRow.getCell(6).value = "Total";
-      totalRow.getCell(6).font = { bold: true };
-      totalRow.getCell(7).value = data.totalVencenEsteMes;
-      totalRow.getCell(7).numFmt = "#,##0";
+      totalRow.getCell(7).value = "Total";
       totalRow.getCell(7).font = { bold: true };
+      totalRow.getCell(8).value = data.totalVencenEsteMes;
+      totalRow.getCell(8).numFmt = "#,##0";
+      totalRow.getCell(8).font = { bold: true };
     }
   } else if (reporteTipo === "vencidas") {
     const sheet = workbook.addWorksheet("Vencidas");
     sheet.columns = [
       { width: 28 },
+      { width: 26 },
       { width: 30 },
       { width: 22 },
       { width: 12 },
@@ -205,6 +217,7 @@ export async function GET(
     ];
     const headers = [
       "Cliente",
+      "Contacto",
       "Propiedad",
       "Proyecto",
       "Contrato",
@@ -218,22 +231,23 @@ export async function GET(
     data.cuotasVencidas.forEach((c, idx) => {
       const row = sheet.getRow(idx + 2);
       row.getCell(1).value = c.nombreCliente;
-      row.getCell(2).value = c.propiedadesTexto || "-";
-      row.getCell(3).value = c.proyectoTexto;
-      row.getCell(4).value = c.numeroContrato ? `N.º ${c.numeroContrato}` : "-";
-      row.getCell(5).value = c.numero_cuota === 0 ? "Inicial" : `#${c.numero_cuota}`;
-      row.getCell(6).value = formatDate(c.fecha_vencimiento);
-      row.getCell(7).value = c.diasMora ?? 0;
-      row.getCell(8).value = c.saldo;
-      row.getCell(8).numFmt = "#,##0";
+      row.getCell(2).value = c.contactoCliente || "-";
+      row.getCell(3).value = c.propiedadesTexto || "-";
+      row.getCell(4).value = c.proyectoTexto;
+      row.getCell(5).value = c.numeroContrato ? `N.º ${c.numeroContrato}` : "-";
+      row.getCell(6).value = c.numero_cuota === 0 ? "Inicial" : `#${c.numero_cuota}`;
+      row.getCell(7).value = formatDate(c.fecha_vencimiento);
+      row.getCell(8).value = c.diasMora ?? 0;
+      row.getCell(9).value = c.saldo;
+      row.getCell(9).numFmt = "#,##0";
     });
     if (data.cuotasVencidas.length > 0) {
       const totalRow = sheet.getRow(data.cuotasVencidas.length + 2);
-      totalRow.getCell(7).value = "Total";
-      totalRow.getCell(7).font = { bold: true };
-      totalRow.getCell(8).value = data.totalVencidas;
-      totalRow.getCell(8).numFmt = "#,##0";
+      totalRow.getCell(8).value = "Total";
       totalRow.getCell(8).font = { bold: true };
+      totalRow.getCell(9).value = data.totalVencidas;
+      totalRow.getCell(9).numFmt = "#,##0";
+      totalRow.getCell(9).font = { bold: true };
     }
   } else if (reporteTipo === "escrituradas") {
     const sheet = workbook.addWorksheet("Escriturados");

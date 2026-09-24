@@ -40,6 +40,8 @@ type ClienteRel = {
   apellido: string;
   razon_social: string | null;
   tipo_persona: string;
+  telefono: string | null;
+  email: string | null;
 } | null;
 
 type PropiedadRel = {
@@ -111,6 +113,16 @@ function nombreClienteDe(cliente: ClienteRel) {
   return `${cliente.apellido}, ${cliente.nombre}`;
 }
 
+/**
+ * Texto de contacto del cliente (teléfono y/o correo) para los reportes de
+ * cuotas por vencer y vencidas, así el que gestiona la cobranza no tiene que
+ * ir a buscar el contrato o el cliente para llamar/escribir.
+ */
+function contactoClienteDe(cliente: ClienteRel) {
+  if (!cliente) return "";
+  return [cliente.telefono, cliente.email].filter(Boolean).join(" / ");
+}
+
 function propiedadesTextoDe(contrato: ContratoConPropiedadesRel | ContratoSoloProyectosRel) {
   return (contrato?.contrato_propiedades ?? [])
     .map((cp) => cp.propiedades?.direccion)
@@ -171,6 +183,7 @@ export type ReporteCuota = {
   numero_cuota: number;
   fecha_vencimiento: string;
   nombreCliente: string;
+  contactoCliente: string;
   propiedadesTexto: string;
   proyectoTexto: string;
   numeroContrato: number | null;
@@ -400,7 +413,7 @@ export async function getReportes(
     supabase
       .from("cuotas")
       .select(
-        "id, numero_cuota, fecha_vencimiento, monto, monto_pagado, estado, contratos(numero, moneda, clientes(nombre, apellido, razon_social, tipo_persona), contrato_propiedades(propiedades(direccion, proyecto_id, proyectos(nombre))))"
+        "id, numero_cuota, fecha_vencimiento, monto, monto_pagado, estado, contratos(numero, moneda, clientes(nombre, apellido, razon_social, tipo_persona, telefono, email), contrato_propiedades(propiedades(direccion, proyecto_id, proyectos(nombre))))"
       )
       .neq("estado", "pagada")
       .order("fecha_vencimiento", { ascending: true }),
@@ -450,6 +463,7 @@ export async function getReportes(
       fecha_vencimiento: c.fecha_vencimiento,
       estado: c.estado,
       nombreCliente: nombreClienteDe(c.contratos?.clientes ?? null),
+      contactoCliente: contactoClienteDe(c.contratos?.clientes ?? null),
       propiedadesTexto: propiedadesTextoDe(c.contratos),
       proyectoTexto: proyectoTextoDe(c.contratos),
       numeroContrato: c.contratos?.numero ?? null,
