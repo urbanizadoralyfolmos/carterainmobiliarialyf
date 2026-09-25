@@ -4,14 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import { formatMoney } from "@/lib/utils/format";
 import { ProyectoForm } from "@/components/ProyectoForm";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
-import {
-  actualizarProyecto,
-  eliminarProyecto,
-  generarLotes,
-  eliminarManzana,
-} from "@/app/(app)/proyectos/actions";
+import { actualizarProyecto, eliminarProyecto, generarLotes, eliminarManzana } from "../actions";
 import { eliminarPropiedad, actualizarSuperficiePropiedad } from "@/app/(app)/propiedades/actions";
-import { esAdmin } from "@/lib/auth/rol";
+import { esAdmin, esAdminOGestor } from "@/lib/auth/rol";
 
 const ESTADO_LABELS: Record<string, string> = {
   disponible: "Disponible",
@@ -38,6 +33,7 @@ export default async function ProyectoDetallePage({
   const { error, manzana: manzanaFiltro } = await searchParams;
   const supabase = await createClient();
   const admin = await esAdmin();
+  const puedeEditarArea = await esAdminOGestor();
 
   const { data: proyecto } = await supabase
     .from("proyectos")
@@ -302,7 +298,7 @@ export default async function ProyectoDetallePage({
                   <td className="px-4 py-2 font-medium text-slate-900">{l.direccion}</td>
                   <td className="px-4 py-2 text-slate-600">{l.manzana ?? "-"}</td>
                   <td className="px-4 py-2 text-slate-600">
-                    {admin ? (
+                    {puedeEditarArea ? (
                       <form
                         action={actualizarSuperficiePropiedad.bind(null, l.id)}
                         className="flex items-center gap-1"

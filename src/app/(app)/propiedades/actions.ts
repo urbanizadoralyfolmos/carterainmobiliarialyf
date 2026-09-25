@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { requireAdmin } from "@/lib/auth/rol";
+import { requireAdmin, requireAdminOGestor } from "@/lib/auth/rol";
 
 // El estado de una propiedad ya no se lee ni se escribe desde este
 // formulario: se calcula automáticamente a partir del contrato vinculado
@@ -126,10 +126,14 @@ export async function eliminarPropiedades(formData: FormData) {
  *
  * `redirect_to` permite volver a la página/filtro desde donde se llamó si
  * algo sale mal (por defecto, la lista de Propiedades).
+ *
+ * Puede usarla un administrador o un gestor: ambos necesitan ir ajustando el
+ * área de cada lote de una manzana recién creada (suelen variar entre sí), y
+ * en los dos casos el valor de referencia se recalcula solo.
  */
 export async function actualizarSuperficiePropiedad(id: string, formData: FormData) {
   const redirectTo = String(formData.get("redirect_to") ?? "").trim() || "/propiedades";
-  await requireAdmin(redirectTo);
+  await requireAdminOGestor(redirectTo);
   const supabase = await createClient();
   const raw = formData.get("superficie_m2");
   const texto = String(raw ?? "").trim();

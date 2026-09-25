@@ -30,6 +30,20 @@ export async function esAdmin(): Promise<boolean> {
   return (await obtenerRolActual()) === "admin";
 }
 
+export async function esGestor(): Promise<boolean> {
+  return (await obtenerRolActual()) === "gestor";
+}
+
+/**
+ * true si el usuario puede editar el área de los lotes al generar/ajustar
+ * manzanas (y por lo tanto disparar el recálculo automático del valor). Lo
+ * puede hacer un administrador o un gestor.
+ */
+export async function esAdminOGestor(): Promise<boolean> {
+  const rol = await obtenerRolActual();
+  return rol === "admin" || rol === "gestor";
+}
+
 /**
  * Chequeo de conveniencia para usar al inicio de un Server Action que solo
  * un administrador puede ejecutar (editar/eliminar). Es una capa de UX sobre
@@ -43,6 +57,22 @@ export async function requireAdmin(
 ): Promise<void> {
   const admin = await esAdmin();
   if (!admin) {
+    redirect(`${redirectTo}?error=${encodeURIComponent(mensaje)}`);
+  }
+}
+
+/**
+ * Igual que `requireAdmin`, pero también deja pasar al rol "gestor". Se usa
+ * en acciones puntuales donde un gestor debe tener el mismo permiso que un
+ * administrador (por ejemplo, editar el área de un lote y que el valor se
+ * recalcule solo).
+ */
+export async function requireAdminOGestor(
+  redirectTo: string,
+  mensaje = "No tienes permisos para realizar esta acción. Consulta a un administrador."
+): Promise<void> {
+  const permitido = await esAdminOGestor();
+  if (!permitido) {
     redirect(`${redirectTo}?error=${encodeURIComponent(mensaje)}`);
   }
 }
