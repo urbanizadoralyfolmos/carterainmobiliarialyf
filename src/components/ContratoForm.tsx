@@ -251,7 +251,7 @@ export function ContratoForm({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700">Fecha de fin</label>
+          <label className="block text-sm font-medium text-slate-700">Fecha de escrituración</label>
           <input
             type="date"
             name="fecha_fin"
