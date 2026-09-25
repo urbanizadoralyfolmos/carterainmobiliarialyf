@@ -42,7 +42,7 @@ export async function crearContrato(formData: FormData) {
   if (!data.fecha_fin) {
     redirect(
       `/contratos/nuevo?error=${encodeURIComponent(
-        "La fecha de finalización del contrato es obligatoria."
+        "La fecha de escrituración del contrato es obligatoria."
       )}`
     );
   }
@@ -136,7 +136,7 @@ export async function actualizarContrato(id: string, formData: FormData) {
   if (!data.fecha_fin) {
     redirect(
       `/contratos/${id}?error=${encodeURIComponent(
-        "La fecha de finalización del contrato es obligatoria."
+        "La fecha de escrituración del contrato es obligatoria."
       )}`
     );
   }
