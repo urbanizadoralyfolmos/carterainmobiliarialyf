@@ -317,6 +317,45 @@ export async function GET(
       totalRow.getCell(6).numFmt = "#,##0";
       totalRow.getCell(6).font = { bold: true };
     }
+  } else if (reporteTipo === "contratos-a-escriturar") {
+    const sheet = workbook.addWorksheet("Contratos a escriturar");
+    sheet.columns = [
+      { width: 16 },
+      { width: 28 },
+      { width: 26 },
+      { width: 30 },
+      { width: 22 },
+      { width: 12 },
+      { width: 20 },
+      { width: 18 },
+    ];
+    const headers = [
+      "Mes",
+      "Cliente",
+      "Contacto",
+      "Propiedad",
+      "Proyecto",
+      "Contrato",
+      "Estado",
+      "Fecha de escrituración",
+    ];
+    const headerRow = sheet.getRow(1);
+    headers.forEach((h, i) => headerCell(headerRow.getCell(i + 1), h));
+    let rowIdx = 2;
+    for (const grupo of data.contratosAEscriturarPorMes) {
+      for (const c of grupo.contratos) {
+        const row = sheet.getRow(rowIdx);
+        row.getCell(1).value = grupo.mes;
+        row.getCell(2).value = c.nombreCliente;
+        row.getCell(3).value = c.contactoCliente || "-";
+        row.getCell(4).value = c.propiedadesTexto || "-";
+        row.getCell(5).value = c.proyectoTexto;
+        row.getCell(6).value = c.numeroContrato ? `N.º ${c.numeroContrato}` : "-";
+        row.getCell(7).value = c.estadoTexto;
+        row.getCell(8).value = formatDate(c.fechaEscrituracion);
+        rowIdx++;
+      }
+    }
   }
 
   const buffer = await workbook.xlsx.writeBuffer();

@@ -16,6 +16,7 @@ export const REPORTE_TIPOS = [
   { tipo: "vencidas", etiqueta: "Cuotas vencidas" },
   { tipo: "escrituradas", etiqueta: "Lotes escriturados por proyecto" },
   { tipo: "lotes-disponibles", etiqueta: "Lotes disponibles para venta" },
+  { tipo: "contratos-a-escriturar", etiqueta: "Contratos a escriturar por mes y proyecto" },
 ] as const;
 
 export type ReporteTipo = (typeof REPORTE_TIPOS)[number]["tipo"];
@@ -87,6 +88,15 @@ type CuotaReporteRow = {
   contratos: ContratoConPropiedadesRel;
 };
 
+type ContratoAEscriturarRow = {
+  id: string;
+  numero: number | null;
+  estado: string;
+  fecha_fin: string;
+  clientes?: ClienteRel;
+  contrato_propiedades?: ContratoPropiedadesRel;
+};
+
 export type PropiedadEscrituradaRow = {
   id: string;
   direccion: string;
@@ -105,6 +115,29 @@ export type LoteDisponibleRow = {
   superficie_m2: number | null;
   valor_referencia: number | null;
   proyecto: string;
+};
+
+const ESTADO_CONTRATO_LABELS: Record<string, string> = {
+  activo: "Activo",
+  paz_y_salvo_sin_escritura: "Paz y salvo (sin escritura)",
+};
+
+export type ReporteContratoAEscriturar = {
+  id: string;
+  numeroContrato: number | null;
+  estado: string;
+  estadoTexto: string;
+  fechaEscrituracion: string;
+  nombreCliente: string;
+  contactoCliente: string;
+  propiedadesTexto: string;
+  proyectoTexto: string;
+};
+
+export type ReporteContratosPorMes = {
+  clave: string;
+  mes: string;
+  contratos: ReporteContratoAEscriturar[];
 };
 
 function nombreClienteDe(cliente: ClienteRel) {
@@ -229,6 +262,9 @@ export type ReportesData = {
   totalLotesDisponibles: number;
   totalAreaLotesDisponibles: number;
   totalValorLotesDisponibles: number;
+  // 7) Contratos a escriturar por mes y proyecto (según fecha de escrituración)
+  contratosAEscriturarPorMes: ReporteContratosPorMes[];
+  totalContratosAEscriturar: number;
 };
 
 function agruparPorMesYProyecto<T extends { fecha: string; monto: number; proyectos: string[] }>(
@@ -379,6 +415,22 @@ export async function getReportes(
     queryLotesDisponibles = queryLotesDisponibles.eq("proyecto_id", proyectoId);
   }
 
+  // Contratos "a escriturar": los que todavía no están escriturados ni
+  // facturados ni anulados, y ya tienen una fecha de escrituración (fecha_fin)
+  // asignada. El filtro de proyecto se aplica del lado del cliente más abajo,
+  // igual que en recibos/cuotas, porque el proyecto cuelga de las propiedades
+  // del contrato, no del contrato directamente.
+  const queryContratosAEscriturar = supabase
+    .from("contratos")
+    .select(
+      "id, numero, estado, fecha_fin, clientes(nombre, apellido, razon_social, tipo_persona, telefono, email), contrato_propiedades(propiedades(direccion, proyecto_id, proyectos(nombre)))"
+    )
+    .not("fecha_fin", "is", null)
+    .in("estado", ["activo", "paz_y_salvo_sin_escritura"])
+    .gte("fecha_fin", `${anio}-01-01`)
+    .lte("fecha_fin", `${anio}-12-31`)
+    .order("fecha_fin", { ascending: true });
+
   const [
     { data: recibosData },
     { data: cuotasEsperadasData },
@@ -387,6 +439,7 @@ export async function getReportes(
     { data: escrituradasData },
     { data: lotesDisponiblesData },
     { data: proyectosDisponiblesData },
+    { data: contratosAEscriturarData },
   ] = await Promise.all([
     supabase
       .from("recibos")
@@ -420,6 +473,7 @@ export async function getReportes(
     queryEscrituradas,
     queryLotesDisponibles,
     supabase.from("proyectos").select("id, nombre").order("nombre"),
+    queryContratosAEscriturar,
   ]);
 
   // --- 1) Dinero recaudado (real) por mes y proyecto ---
@@ -530,6 +584,44 @@ export async function getReportes(
     0
   );
 
+  // --- 7) Contratos a escriturar por mes y proyecto ---
+  const contratosAEscriturar: ReporteContratoAEscriturar[] = (
+    (contratosAEscriturarData ?? []) as unknown as ContratoAEscriturarRow[]
+  )
+    .filter((c) =>
+      coincideProyecto(
+        proyectoIdsDe({ contrato_propiedades: c.contrato_propiedades }),
+        proyectoId
+      )
+    )
+    .map((c) => ({
+      id: c.id,
+      numeroContrato: c.numero,
+      estado: c.estado,
+      estadoTexto: ESTADO_CONTRATO_LABELS[c.estado] ?? c.estado,
+      fechaEscrituracion: c.fecha_fin,
+      nombreCliente: nombreClienteDe(c.clientes ?? null),
+      contactoCliente: contactoClienteDe(c.clientes ?? null),
+      propiedadesTexto: propiedadesTextoDe({ contrato_propiedades: c.contrato_propiedades }),
+      proyectoTexto: proyectoTextoDe({ contrato_propiedades: c.contrato_propiedades }),
+    }))
+    .sort((a, b) => a.fechaEscrituracion.localeCompare(b.fechaEscrituracion));
+
+  const gruposPorMes = new Map<string, ReporteContratoAEscriturar[]>();
+  for (const c of contratosAEscriturar) {
+    const clave = c.fechaEscrituracion.slice(0, 7); // "YYYY-MM"
+    if (!gruposPorMes.has(clave)) gruposPorMes.set(clave, []);
+    gruposPorMes.get(clave)?.push(c);
+  }
+  const contratosAEscriturarPorMes: ReporteContratosPorMes[] = Array.from(
+    gruposPorMes.entries()
+  )
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([clave, contratos]) => {
+      const [anioClave, mesClave] = clave.split("-").map(Number);
+      return { clave, mes: `${MESES[mesClave - 1]} ${anioClave}`, contratos };
+    });
+
   return {
     anio,
     proyectoSeleccionado: proyectoId ?? null,
@@ -556,5 +648,7 @@ export async function getReportes(
     totalLotesDisponibles: lotesDisponibles.length,
     totalAreaLotesDisponibles,
     totalValorLotesDisponibles,
+    contratosAEscriturarPorMes,
+    totalContratosAEscriturar: contratosAEscriturar.length,
   };
 }

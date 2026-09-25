@@ -46,6 +46,8 @@ const styles = StyleSheet.create({
   colFecha: { width: "11%" },
   colDias: { width: "8%" },
   colSaldo: { width: "12%" },
+  colEstadoContrato: { width: "10%" },
+  colMesContrato: { width: "12%" },
   sectionSubtitle: {
     fontSize: 8,
     fontWeight: "bold",
@@ -375,8 +377,7 @@ export async function GET(
         </Page>
       </Document>
     );
-  } else {
-    // reporteTipo === "lotes-disponibles"
+  } else if (reporteTipo === "lotes-disponibles") {
     doc = (
       <Document>
         <Page size="A4" style={styles.page}>
@@ -419,6 +420,56 @@ export async function GET(
             </View>
           ) : (
             <Text style={styles.td}>No hay lotes disponibles para este filtro.</Text>
+          )}
+        </Page>
+      </Document>
+    );
+  } else {
+    // reporteTipo === "contratos-a-escriturar"
+    doc = (
+      <Document>
+        <Page size="A4" style={styles.page}>
+          <Text style={styles.title}>Contratos a escriturar por mes y proyecto</Text>
+          <Text style={styles.subtitle}>Generado el {generado}</Text>
+
+          {data.contratosAEscriturarPorMes.length > 0 ? (
+            data.contratosAEscriturarPorMes.map((grupo) => (
+              <View key={grupo.clave}>
+                <Text style={styles.sectionSubtitle}>
+                  {grupo.mes} ({grupo.contratos.length})
+                </Text>
+                <View style={styles.table}>
+                  <View style={styles.tableHeaderRow}>
+                    <Text style={[styles.th, styles.colCliente]}>Cliente</Text>
+                    <Text style={[styles.th, styles.colContacto]}>Contacto</Text>
+                    <Text style={[styles.th, styles.colPropiedad]}>Propiedad</Text>
+                    <Text style={[styles.th, styles.colProyectoCuota]}>Proyecto</Text>
+                    <Text style={[styles.th, styles.colContrato]}>Contrato</Text>
+                    <Text style={[styles.th, styles.colEstadoContrato]}>Estado</Text>
+                    <Text style={[styles.th, styles.colMesContrato]}>Escrituración</Text>
+                  </View>
+                  {grupo.contratos.map((c) => (
+                    <View style={styles.tableRow} key={c.id}>
+                      <Text style={[styles.td, styles.colCliente]}>{c.nombreCliente}</Text>
+                      <Text style={[styles.td, styles.colContacto]}>{c.contactoCliente || "-"}</Text>
+                      <Text style={[styles.td, styles.colPropiedad]}>
+                        {c.propiedadesTexto || "-"}
+                      </Text>
+                      <Text style={[styles.td, styles.colProyectoCuota]}>{c.proyectoTexto}</Text>
+                      <Text style={[styles.td, styles.colContrato]}>
+                        {c.numeroContrato ? `N.º ${c.numeroContrato}` : "-"}
+                      </Text>
+                      <Text style={[styles.td, styles.colEstadoContrato]}>{c.estadoTexto}</Text>
+                      <Text style={[styles.td, styles.colMesContrato]}>
+                        {formatDate(c.fechaEscrituracion)}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ))
+          ) : (
+            <Text style={styles.td}>No hay contratos pendientes de escriturar para este filtro.</Text>
           )}
         </Page>
       </Document>

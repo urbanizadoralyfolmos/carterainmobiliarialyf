@@ -63,6 +63,7 @@ export default async function ReportesPage({
     { id: "vencen-mes", label: "Vencen este mes" },
     { id: "vencidas", label: "Vencidas" },
     { id: "escrituradas", label: "Escriturados" },
+    { id: "contratos-a-escriturar", label: "Contratos a escriturar" },
   ];
 
   return (
@@ -563,6 +564,70 @@ export default async function ReportesPage({
           ))}
           {data.escrituradasPorProyecto.length === 0 && (
             <p className="text-sm text-slate-400">Todavía no hay lotes escriturados.</p>
+          )}
+        </div>
+      </div>
+
+      {/* 6. Contratos a escriturar por mes y proyecto */}
+      <div
+        id="contratos-a-escriturar"
+        className="mt-4 scroll-mt-20 rounded-lg border border-slate-200 bg-white p-4"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-slate-900">
+            Contratos a escriturar por mes y proyecto ({data.totalContratosAEscriturar})
+          </h2>
+          <DescargarReporte tipo="contratos-a-escriturar" anio={anio} proyecto={proyectoParam} />
+        </div>
+        <p className="mt-1 text-xs text-slate-400">
+          Contratos activos o paz y salvo (sin escritura) cuya fecha de escrituración cae en el
+          año {anio}, agrupados por mes. Incluye los datos de contacto del cliente para coordinar
+          la escrituración.
+        </p>
+        <div className="mt-3 space-y-4">
+          {data.contratosAEscriturarPorMes.map((grupo) => (
+            <div key={grupo.clave}>
+              <h3 className="text-xs font-semibold uppercase text-slate-500">
+                {grupo.mes} ({grupo.contratos.length})
+              </h3>
+              <div className="mt-1 overflow-x-auto">
+                <table className="min-w-full divide-y divide-slate-200 text-sm">
+                  <thead className="text-left text-xs uppercase text-slate-500">
+                    <tr>
+                      <th className="whitespace-nowrap py-1 pr-3">Cliente</th>
+                      <th className="whitespace-nowrap py-1 pr-3">Contacto</th>
+                      <th className="whitespace-nowrap py-1 pr-3">Propiedad</th>
+                      <th className="whitespace-nowrap py-1 pr-3">Proyecto</th>
+                      <th className="whitespace-nowrap py-1 pr-3">Contrato</th>
+                      <th className="whitespace-nowrap py-1 pr-3">Estado</th>
+                      <th className="whitespace-nowrap py-1 pr-3">Fecha de escrituración</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {grupo.contratos.map((c) => (
+                      <tr key={c.id}>
+                        <td className="py-1 pr-3 font-medium text-slate-900">{c.nombreCliente}</td>
+                        <td className="py-1 pr-3 text-slate-600">{c.contactoCliente || "-"}</td>
+                        <td className="py-1 pr-3 text-slate-600">{c.propiedadesTexto || "-"}</td>
+                        <td className="py-1 pr-3 text-slate-600">{c.proyectoTexto}</td>
+                        <td className="py-1 pr-3 text-slate-600">
+                          {c.numeroContrato ? `N.º ${c.numeroContrato}` : "-"}
+                        </td>
+                        <td className="py-1 pr-3 text-slate-600">{c.estadoTexto}</td>
+                        <td className="py-1 pr-3 text-slate-600">
+                          {formatDate(c.fechaEscrituracion)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+          {data.contratosAEscriturarPorMes.length === 0 && (
+            <p className="text-sm text-slate-400">
+              No hay contratos pendientes de escriturar para este filtro.
+            </p>
           )}
         </div>
       </div>
