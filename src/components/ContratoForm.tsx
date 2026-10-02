@@ -5,6 +5,17 @@ import type { Cliente, Contrato, Propiedad } from "@/lib/types";
 import { fechaCuota } from "@/lib/utils/plan";
 import { formatMoney } from "@/lib/utils/format";
 
+/** Quita todo lo que no sea dígito (para interpretar lo que el usuario escribe). */
+function soloDigitos(valor: string) {
+  return valor.replace(/\D/g, "");
+}
+
+/** Formatea una cadena de dígitos con puntos separadores de miles, ej. "1000000" -> "1.000.000". */
+function formatearMiles(digitos: string) {
+  if (!digitos) return "";
+  return digitos.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
 export function ContratoForm({
   contrato,
   clientes,
@@ -31,6 +42,13 @@ export function ContratoForm({
   const [montos, setMontos] = useState<number[]>(
     Array.from({ length: contrato?.cantidad_cuotas ?? 12 }, () => 0)
   );
+  // Texto tal cual lo escribe el usuario en cada cuota (solo dígitos, sin
+  // formatear), separado del monto numérico de arriba. Así el campo puede
+  // quedar vacío mientras se escribe en vez de forzar un "0" fijo, y el
+  // valor que se ve en pantalla sale formateado con puntos de miles.
+  const [montosTexto, setMontosTexto] = useState<string[]>(
+    Array.from({ length: contrato?.cantidad_cuotas ?? 12 }, () => "")
+  );
   // Fechas de cada cuota del plan generado: por defecto se calculan a
   // partir de la fecha de inicio (mismo día del mes, mensual), pero quedan
   // editables una por una. Solo se guarda aquí la fecha de las cuotas que
@@ -56,6 +74,11 @@ export function ContratoForm({
     setMontos((prev) => {
       const next = prev.slice(0, cantidadCuotas);
       while (next.length < cantidadCuotas) next.push(0);
+      return next;
+    });
+    setMontosTexto((prev) => {
+      const next = prev.slice(0, cantidadCuotas);
+      while (next.length < cantidadCuotas) next.push("");
       return next;
     });
   }, [cantidadCuotas]);
@@ -366,20 +389,28 @@ export function ContratoForm({
                     </td>
                     <td className="px-4 py-2">
                       <input
-                        type="number"
-                        step="0.01"
-                        name={`monto_cuota_${i + 1}`}
-                        value={montos[i] ?? 0}
+                        type="text"
+                        inputMode="numeric"
+                        value={formatearMiles(montosTexto[i] ?? "")}
                         onChange={(e) => {
-                          const v = Number(e.target.value) || 0;
+                          const digitos = soloDigitos(e.target.value);
+                          setMontosTexto((prev) => {
+                            const next = [...prev];
+                            next[i] = digitos;
+                            return next;
+                          });
                           setMontos((prev) => {
                             const next = [...prev];
-                            next[i] = v;
+                            next[i] = digitos ? Number(digitos) : 0;
                             return next;
                           });
                         }}
+                        placeholder="0"
                         className="w-32 rounded-md border border-slate-300 px-2 py-1 text-sm"
                       />
+                      {/* El campo visible solo muestra el formato con puntos; lo que
+                          realmente se envía al guardar es el monto numérico sin puntos. */}
+                      <input type="hidden" name={`monto_cuota_${i + 1}`} value={montos[i] ?? 0} />
                     </td>
                   </tr>
                 ))}
