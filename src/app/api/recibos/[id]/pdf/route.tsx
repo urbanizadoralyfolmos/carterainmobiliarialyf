@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Document, Page, Text, View, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
+import { Document, Page, Text, View, Image, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
 import { createClient } from "@/lib/supabase/server";
 import { formatMoney, formatDate } from "@/lib/utils/format";
+import { ENCABEZADO_RECIBO_URI } from "@/lib/encabezadoRecibo";
 
 export const runtime = "nodejs";
 
@@ -14,6 +15,7 @@ function nombreProyecto(rel: ProyectoRel) {
 
 const styles = StyleSheet.create({
   page: { padding: 48, fontSize: 10, fontFamily: "Helvetica" },
+  encabezadoImagen: { width: "100%", marginBottom: 20 },
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -80,6 +82,8 @@ export async function GET(
   const doc = (
     <Document>
       <Page size="A4" style={styles.page}>
+        <Image src={ENCABEZADO_RECIBO_URI} style={styles.encabezadoImagen} />
+
         <View style={styles.headerRow}>
           <View>
             <Text style={styles.title}>Recibo de pago</Text>
