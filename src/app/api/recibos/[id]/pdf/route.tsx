@@ -7,6 +7,7 @@ import { ENCABEZADO_RECIBO_URI } from "@/lib/encabezadoRecibo";
 export const runtime = "nodejs";
 
 type ProyectoRel = { nombre: string } | { nombre: string }[] | null | undefined;
+type DetalleCuota = { cuota_id: string; numero_cuota: number; monto: number };
 
 function nombreProyecto(rel: ProyectoRel) {
   if (Array.isArray(rel)) return rel[0]?.nombre ?? "";
@@ -34,6 +35,8 @@ const styles = StyleSheet.create({
   label: { fontSize: 9, color: "#64748b" },
   valor: { fontSize: 11, fontWeight: "bold", color: "#0f172a", marginTop: 2 },
   valorChico: { fontSize: 8, color: "#94a3b8", marginTop: 2 },
+  filaCuota: { flexDirection: "row", justifyContent: "space-between" },
+  valorCuotaMonto: { fontSize: 9, fontWeight: "normal", color: "#64748b" },
   totalBox: {
     marginTop: 12,
     backgroundColor: "#f8fafc",
@@ -78,6 +81,10 @@ export async function GET(
     .filter(Boolean) as { direccion: string; proyectos?: ProyectoRel }[];
   const moneda = contrato?.moneda ?? "COP";
   const nombreCliente = cliente ? `${cliente.nombre} ${cliente.apellido}` : "-";
+
+  const detalleCuotas = ((recibo.detalle_cuotas ?? []) as DetalleCuota[])
+    .slice()
+    .sort((a, b) => a.numero_cuota - b.numero_cuota);
 
   const doc = (
     <Document>
@@ -127,11 +134,26 @@ export async function GET(
               <Text style={styles.valor}>-</Text>
             )}
           </View>
-          <View style={styles.campo}>
-            <Text style={styles.label}>Cuota</Text>
-            <Text style={styles.valor}>
-              {cuota?.numero_cuota === 0 ? "Cuota inicial" : `Cuota #${cuota?.numero_cuota}`}
+          <View style={styles.campoAncho}>
+            <Text style={styles.label}>
+              Cuota{detalleCuotas.length > 1 ? "s cubiertas" : ""}
             </Text>
+            {detalleCuotas.length > 0 ? (
+              detalleCuotas.map((d) => (
+                <View key={d.cuota_id} style={styles.filaCuota}>
+                  <Text style={styles.valor}>
+                    {d.numero_cuota === 0 ? "Cuota inicial" : `Cuota #${d.numero_cuota}`}
+                  </Text>
+                  {detalleCuotas.length > 1 && (
+                    <Text style={styles.valorCuotaMonto}>{formatMoney(d.monto, moneda)}</Text>
+                  )}
+                </View>
+              ))
+            ) : (
+              <Text style={styles.valor}>
+                {cuota?.numero_cuota === 0 ? "Cuota inicial" : `Cuota #${cuota?.numero_cuota}`}
+              </Text>
+            )}
           </View>
           {cuota?.referencia && (
             <View style={styles.campo}>
