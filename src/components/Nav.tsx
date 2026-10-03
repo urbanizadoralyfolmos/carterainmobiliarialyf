@@ -1,5 +1,5 @@
-import { LogoMark } from "./LogoMark";
 import { NavLinks } from "./NavLinks";
+import { BANNER_APP_URI } from "@/lib/bannerApp";
 
 export function Nav({
   email,
@@ -12,12 +12,12 @@ export function Nav({
     <header className="border-t-2 border-b border-t-brand border-b-slate-200 bg-white print:hidden">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-y-2 px-4 py-3">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-          <span className="flex items-center gap-2">
-            <LogoMark className="h-6 w-6 shrink-0" />
-            <span className="text-xs font-semibold tracking-tight text-slate-900 sm:text-sm">
-              CARTERA URBANIZADORA LYF OLMOS
-            </span>
-          </span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={BANNER_APP_URI}
+            alt="Urbanizadora LYF Olmos — Gestión de Cartera"
+            className="h-10 w-auto sm:h-12"
+          />
           <NavLinks rol={rol} />
         </div>
         <div className="flex items-center gap-3">
