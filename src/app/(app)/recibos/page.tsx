@@ -4,10 +4,26 @@ import { formatMoney, formatDate } from "@/lib/utils/format";
 import { SearchInput } from "@/components/SearchInput";
 
 type ProyectoRel = { nombre: string } | { nombre: string }[] | null | undefined;
+type DetalleCuota = { cuota_id: string; numero_cuota: number; monto: number };
 
 function nombreProyecto(rel: ProyectoRel) {
   if (Array.isArray(rel)) return rel[0]?.nombre ?? "";
   return rel?.nombre ?? "";
+}
+
+function etiquetaCuotas(detalle: DetalleCuota[], numeroCuotaAncla?: number | null) {
+  if (detalle.length === 0) {
+    return numeroCuotaAncla === 0
+      ? "Inicial"
+      : numeroCuotaAncla != null
+      ? `#${numeroCuotaAncla}`
+      : "-";
+  }
+  return detalle
+    .slice()
+    .sort((a, b) => a.numero_cuota - b.numero_cuota)
+    .map((d) => (d.numero_cuota === 0 ? "Inicial" : `#${d.numero_cuota}`))
+    .join(", ");
 }
 
 export default async function RecibosPage({
@@ -26,7 +42,7 @@ export default async function RecibosPage({
     .order("created_at", { ascending: false });
 
   if (cuota) {
-    query = query.eq("cuota_id", cuota);
+    query = query.contains("cuota_ids", [cuota]);
   }
 
   const [{ data: recibos, error }, { data: proyectos }] = await Promise.all([
@@ -63,6 +79,7 @@ export default async function RecibosPage({
           .filter((v): v is string => Boolean(v))
       )
     );
+    const detalleCuotas = (r.detalle_cuotas ?? []) as DetalleCuota[];
     return {
       ...r,
       nombreCliente,
@@ -71,6 +88,7 @@ export default async function RecibosPage({
       proyectosTexto,
       proyectoIds,
       numeroContrato: contrato?.numero,
+      cuotaEtiqueta: etiquetaCuotas(detalleCuotas, c?.numero_cuota),
     };
   });
 
@@ -192,9 +210,7 @@ export default async function RecibosPage({
                   <td className="px-4 py-2 text-slate-600">
                     {r.numeroContrato ? `N.º ${r.numeroContrato}` : "-"}
                   </td>
-                  <td className="px-4 py-2 text-slate-600">
-                    {c?.numero_cuota === 0 ? "Inicial" : `#${c?.numero_cuota}`}
-                  </td>
+                  <td className="px-4 py-2 text-slate-600">{r.cuotaEtiqueta}</td>
                   <td className="px-4 py-2 text-slate-600">{formatDate(r.fecha_pago)}</td>
                   <td className="px-4 py-2 text-slate-600">{formatMoney(r.monto, moneda)}</td>
                   <td className="whitespace-nowrap px-4 py-2 text-right">
