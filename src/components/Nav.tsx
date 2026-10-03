@@ -10,16 +10,16 @@ export function Nav({
 }) {
   return (
     <header className="border-t-2 border-b border-t-brand border-b-slate-200 bg-white print:hidden">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-y-2 px-4 py-3">
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={BANNER_APP_URI}
-            alt="Urbanizadora LYF Olmos — Gestión de Cartera"
-            className="h-10 w-auto sm:h-12"
-          />
-          <NavLinks rol={rol} />
-        </div>
+      <div className="flex w-full items-center justify-center bg-white py-2">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={BANNER_APP_URI}
+          alt="Urbanizadora LYF Olmos — Gestión de Cartera"
+          className="h-16 w-auto sm:h-20"
+        />
+      </div>
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-y-2 border-t border-slate-100 px-4 py-3">
+        <NavLinks rol={rol} />
         <div className="flex items-center gap-3">
           {email && <span className="text-sm text-slate-500">{email}</span>}
           <form action="/logout" method="post">
