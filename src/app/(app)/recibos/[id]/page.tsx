@@ -5,6 +5,8 @@ import { formatMoney, formatDate } from "@/lib/utils/format";
 import { PrintButton } from "@/components/PrintButton";
 import { ENCABEZADO_RECIBO_URI } from "@/lib/encabezadoRecibo";
 
+type DetalleCuota = { cuota_id: string; numero_cuota: number; monto: number };
+
 export default async function ReciboPage({
   params,
 }: {
@@ -41,6 +43,10 @@ export default async function ReciboPage({
   }[];
   const moneda = contrato?.moneda ?? "COP";
   const hrefCuotas = contrato?.id ? `/cuotas?contrato=${contrato.id}` : "/cuotas";
+
+  const detalleCuotas = ((recibo.detalle_cuotas ?? []) as DetalleCuota[])
+    .slice()
+    .sort((a, b) => a.numero_cuota - b.numero_cuota);
 
   return (
     <div>
@@ -112,11 +118,24 @@ export default async function ReciboPage({
               <p className="font-medium text-slate-900">-</p>
             )}
           </div>
-          <div>
-            <p className="text-slate-500">Cuota</p>
-            <p className="font-medium text-slate-900">
-              {cuota?.numero_cuota === 0 ? "Cuota inicial" : `Cuota #${cuota?.numero_cuota}`}
-            </p>
+          <div className="col-span-2">
+            <p className="text-slate-500">Cuota{detalleCuotas.length > 1 ? "s cubiertas" : ""}</p>
+            {detalleCuotas.length > 0 ? (
+              detalleCuotas.map((d) => (
+                <p key={d.cuota_id} className="font-medium text-slate-900">
+                  {d.numero_cuota === 0 ? "Cuota inicial" : `Cuota #${d.numero_cuota}`}
+                  {detalleCuotas.length > 1 && (
+                    <span className="ml-2 font-normal text-slate-500">
+                      {formatMoney(d.monto, moneda)}
+                    </span>
+                  )}
+                </p>
+              ))
+            ) : (
+              <p className="font-medium text-slate-900">
+                {cuota?.numero_cuota === 0 ? "Cuota inicial" : `Cuota #${cuota?.numero_cuota}`}
+              </p>
+            )}
           </div>
           {cuota?.referencia && (
             <div>
